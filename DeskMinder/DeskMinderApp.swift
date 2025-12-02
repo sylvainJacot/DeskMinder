@@ -9,9 +9,12 @@ import SwiftUI
 
 @main
 struct DeskMinderApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    
     var body: some Scene {
-        WindowGroup {
-            ContentView()
+        // Pas de fenêtre principale, juste éventuellement des réglages
+        Settings {
+            EmptyView()
         }
     }
 }

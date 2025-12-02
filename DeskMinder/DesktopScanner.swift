@@ -1,0 +1,210 @@
+import Foundation
+import Combine
+
+class DesktopScanner: ObservableObject {
+    @Published var items: [DesktopItem] = []
+    @Published private(set) var itemCount: Int = 0
+    @Published var selectedItems: Set<UUID> = []
+    
+    /// Seuil minimal en jours pour considérer un fichier comme "ancien"
+    @Published var minDaysOld: Int = 7 {
+        didSet {
+            refresh()
+        }
+    }
+    
+    // Options de tri
+    enum SortOption: String, CaseIterable {
+        case nameAsc = "Nom (A-Z)"
+        case nameDesc = "Nom (Z-A)"
+        case dateOldest = "Plus ancien"
+        case dateNewest = "Plus récent"
+        case ageHighest = "Âge (décroissant)"
+        case ageLowest = "Âge (croissant)"
+    }
+    
+    @Published var sortOption: SortOption = .dateOldest {
+        didSet {
+            applySorting()
+        }
+    }
+    
+    private let fileManager = FileManager.default
+    
+    init() {
+        refresh()
+    }
+    
+    func refresh() {
+        selectedItems.removeAll() // Désélectionner lors du refresh
+        
+        guard let desktopURL = fileManager.urls(for: .desktopDirectory, in: .userDomainMask).first else {
+            print("Impossible de trouver le dossier Desktop")
+            return
+        }
+        
+        do {
+            let contents = try fileManager.contentsOfDirectory(
+                at: desktopURL,
+                includingPropertiesForKeys: [.contentModificationDateKey, .isDirectoryKey, .fileSizeKey],
+                options: [.skipsHiddenFiles]
+            )
+            
+            var newItems: [DesktopItem] = []
+            
+            for url in contents {
+                let resourceValues = try url.resourceValues(forKeys: [.isDirectoryKey, .contentModificationDateKey, .fileSizeKey])
+                
+                if resourceValues.isDirectory == true {
+                    continue
+                }
+                
+                guard let lastModified = resourceValues.contentModificationDate else {
+                    continue
+                }
+                
+                let item = DesktopItem(
+                    url: url,
+                    name: url.lastPathComponent,
+                    lastModified: lastModified,
+                    fileSize: resourceValues.fileSize ?? 0
+                )
+                
+                if item.daysOld >= minDaysOld {
+                    newItems.append(item)
+                }
+            }
+            
+            DispatchQueue.main.async {
+                self.items = newItems
+                self.itemCount = newItems.count
+                self.applySorting()
+            }
+            
+        } catch {
+            print("Erreur en lisant le Desktop : \(error)")
+        }
+    }
+    
+    private func applySorting() {
+        switch sortOption {
+        case .nameAsc:
+            items.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        case .nameDesc:
+            items.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedDescending }
+        case .dateOldest:
+            items.sort { $0.lastModified < $1.lastModified }
+        case .dateNewest:
+            items.sort { $0.lastModified > $1.lastModified }
+        case .ageHighest:
+            items.sort { $0.daysOld > $1.daysOld }
+        case .ageLowest:
+            items.sort { $0.daysOld < $1.daysOld }
+        }
+    }
+    
+    // MARK: - Sélection
+    
+    func toggleSelection(_ itemId: UUID) {
+        if selectedItems.contains(itemId) {
+            selectedItems.remove(itemId)
+        } else {
+            selectedItems.insert(itemId)
+        }
+    }
+    
+    func selectAll() {
+        selectedItems = Set(items.map { $0.id })
+    }
+    
+    func deselectAll() {
+        selectedItems.removeAll()
+    }
+    
+    var isAllSelected: Bool {
+        !items.isEmpty && selectedItems.count == items.count
+    }
+    
+    var selectedCount: Int {
+        selectedItems.count
+    }
+    
+    // MARK: - Actions groupées
+    
+    func moveSelectedToTrash() -> Result<Int, Error> {
+        let itemsToDelete = items.filter { selectedItems.contains($0.id) }
+        var successCount = 0
+        
+        for item in itemsToDelete {
+            do {
+                try fileManager.trashItem(at: item.url, resultingItemURL: nil)
+                successCount += 1
+            } catch {
+                print("Erreur lors de la mise à la corbeille de \(item.name): \(error)")
+                return .failure(error)
+            }
+        }
+        
+        // Refresh après suppression
+        refresh()
+        
+        return .success(successCount)
+    }
+    
+    func moveSelectedToFolder(_ destinationURL: URL) -> Result<Int, Error> {
+        let itemsToMove = items.filter { selectedItems.contains($0.id) }
+        var successCount = 0
+        
+        for item in itemsToMove {
+            let destination = destinationURL.appendingPathComponent(item.name)
+            
+            do {
+                // Gérer les conflits de noms
+                var finalDestination = destination
+                var counter = 1
+                
+                while fileManager.fileExists(atPath: finalDestination.path) {
+                    let nameWithoutExt = item.url.deletingPathExtension().lastPathComponent
+                    let ext = item.url.pathExtension
+                    let newName = ext.isEmpty ? "\(nameWithoutExt) \(counter)" : "\(nameWithoutExt) \(counter).\(ext)"
+                    finalDestination = destinationURL.appendingPathComponent(newName)
+                    counter += 1
+                }
+                
+                try fileManager.moveItem(at: item.url, to: finalDestination)
+                successCount += 1
+            } catch {
+                print("Erreur lors du déplacement de \(item.name): \(error)")
+                return .failure(error)
+            }
+        }
+        
+        // Refresh après déplacement
+        refresh()
+        
+        return .success(successCount)
+    }
+    
+    func createFolderAndMove(folderName: String, in parentURL: URL) -> Result<URL, Error> {
+        let newFolderURL = parentURL.appendingPathComponent(folderName)
+        
+        do {
+            // Créer le dossier s'il n'existe pas
+            if !fileManager.fileExists(atPath: newFolderURL.path) {
+                try fileManager.createDirectory(at: newFolderURL, withIntermediateDirectories: false)
+            }
+            
+            // Déplacer les fichiers
+            let result = moveSelectedToFolder(newFolderURL)
+            
+            switch result {
+            case .success:
+                return .success(newFolderURL)
+            case .failure(let error):
+                return .failure(error)
+            }
+        } catch {
+            return .failure(error)
+        }
+    }
+}
