@@ -16,6 +16,10 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 0) {
             header
             
+            if let score = scanner.cleanlinessScore {
+                cleanlinessCard(for: score)
+            }
+            
             Divider()
             
             if !scanner.items.isEmpty {
@@ -68,6 +72,7 @@ struct ContentView: View {
             refreshQuickLookSelection()
         }
     }
+
     
     // MARK: - Header
     
@@ -110,12 +115,84 @@ struct ContentView: View {
                 .frame(width: 180)
             }
             
-            Slider(value: Binding(
-                get: { Double(scanner.minDaysOld) },
-                set: { scanner.minDaysOld = Int($0) }
-            ), in: 1...30, step: 1)
+            Slider(
+                value: Binding(
+                    get: { Double(scanner.minDaysOld) },
+                    set: { newValue in
+                        let roundedValue = Int(newValue.rounded())
+                        let clampedValue = min(
+                            max(roundedValue, DesktopScanner.allowedDaysRange.lowerBound),
+                            DesktopScanner.allowedDaysRange.upperBound
+                        )
+                        scanner.minDaysOld = clampedValue
+                    }
+                ),
+                in: Double(DesktopScanner.allowedDaysRange.lowerBound)...Double(DesktopScanner.allowedDaysRange.upperBound),
+                step: 1
+            )
         }
         .padding()
+    }
+
+    // MARK: - Cleanliness Score
+    
+    @ViewBuilder
+    private func cleanlinessCard(for score: DeskCleanlinessScore) -> some View {
+        let accentColor = cleanlinessAccentColor(for: score.score)
+        
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .lastTextBaseline) {
+                Text("Indice de propreté du bureau :")
+                    .font(.headline)
+                Text("\(score.score)/100")
+                    .font(.title3)
+                    .fontWeight(.bold)
+                    .foregroundColor(accentColor)
+            }
+            
+            ProgressView(value: Double(score.score), total: 100)
+                .tint(accentColor)
+            
+            HStack {
+                Text(fileCountLabel(score.fileCount))
+                Spacer()
+                Text(oldFileCountLabel(score.oldFileCount))
+                Spacer()
+                Text("Âge moyen : \(score.formattedAverageAge) jours")
+            }
+            .font(.caption)
+            .foregroundColor(.secondary)
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color.black.opacity(0.05), lineWidth: 0.5)
+        )
+        .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 4)
+        .padding()
+    }
+    
+    private func cleanlinessAccentColor(for score: Int) -> Color {
+        switch score {
+        case 80...100:
+            return .green
+        case 50..<80:
+            return .orange
+        default:
+            return .red
+        }
+    }
+    
+    private func fileCountLabel(_ count: Int) -> String {
+        count > 1 ? "\(count) fichiers" : "\(count) fichier"
+    }
+    
+    private func oldFileCountLabel(_ count: Int) -> String {
+        count > 1 ? "\(count) fichiers anciens" : "\(count) fichier ancien"
     }
     
     // MARK: - Selection Toolbar
@@ -556,9 +633,33 @@ struct NewFolderSheet: View {
     }
 }
 
-#Preview {
-    ContentView(scanner: DesktopScanner())
+#if DEBUG
+final class DesktopScannerPreviewMock: DesktopScanner {
+    private let previewScore: DeskCleanlinessScore
+    
+    init(score: DeskCleanlinessScore) {
+        self.previewScore = score
+        super.init()
+        self.cleanlinessScore = score
+    }
+    
+    override func refresh() {
+        cleanlinessScore = previewScore
+    }
 }
+
+#Preview("Score élevé") {
+    ContentView(scanner: DesktopScannerPreviewMock(score: DeskCleanlinessScore(fileCount: 5, oldFileCount: 1, averageAge: 2)))
+}
+
+#Preview("Score moyen") {
+    ContentView(scanner: DesktopScannerPreviewMock(score: DeskCleanlinessScore(fileCount: 20, oldFileCount: 8, averageAge: 12)))
+}
+
+#Preview("Score faible") {
+    ContentView(scanner: DesktopScannerPreviewMock(score: DeskCleanlinessScore(fileCount: 45, oldFileCount: 25, averageAge: 45)))
+}
+#endif
 
 // MARK: - Quick Look Coordinator
 

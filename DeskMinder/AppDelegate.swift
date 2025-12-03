@@ -10,6 +10,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let scanner = DesktopScanner()
     private var cancellables = Set<AnyCancellable>()
     
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+    
     func applicationDidFinishLaunching(_ notification: Notification) {
         // 1. Icône barre de menu
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -22,10 +26,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // 2. Popover avec vue SwiftUI
         popover.behavior = .applicationDefined
-        popover.contentSize = NSSize(width: 420, height: 500)
+        let screenHeight = NSScreen.main?.visibleFrame.height ?? 0
+        let popoverHeight = screenHeight > 0 ? screenHeight * 0.9 : 500
+        popover.contentSize = NSSize(width: 420, height: popoverHeight)
         popover.contentViewController = NSHostingController(
             rootView: ContentView(scanner: scanner)
         )
+        NotificationManager.shared.requestAuthorization() // Appelé au lancement; lancer l’app via Xcode et dépasser le seuil pour tester les notifications.
         
         updateStatusItemCount(scanner.itemCount)
         
@@ -35,15 +42,32 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.updateStatusItemCount(count)
             }
             .store(in: &cancellables)
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleOpenPopoverRequest),
+            name: .deskMinderShowPopover,
+            object: nil
+        )
     }
     
     @objc func togglePopover(_ sender: Any?) {
         if popover.isShown {
             popover.performClose(sender)
-        } else if let button = statusItem.button {
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            popover.contentViewController?.view.window?.makeKey()
+        } else {
+            showPopover()
         }
+    }
+    
+    private func showPopover() {
+        guard let button = statusItem.button else { return }
+        NSApp.activate(ignoringOtherApps: true)
+        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        popover.contentViewController?.view.window?.makeKey()
+    }
+    
+    @objc private func handleOpenPopoverRequest() {
+        showPopover()
     }
     
     private func updateStatusItemCount(_ count: Int) {

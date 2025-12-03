@@ -2,13 +2,27 @@ import Foundation
 import Combine
 
 class DesktopScanner: ObservableObject {
+    static let allowedDaysRange: ClosedRange<Int> = 1...2000
+    
     @Published var items: [DesktopItem] = []
     @Published private(set) var itemCount: Int = 0
     @Published var selectedItems: Set<UUID> = []
+    @Published var cleanlinessScore: DeskCleanlinessScore?
+    let fileCountThreshold = 15
     
     /// Seuil minimal en jours pour considérer un fichier comme "ancien"
     @Published var minDaysOld: Int = 7 {
         didSet {
+            let clampedValue = min(
+                max(minDaysOld, DesktopScanner.allowedDaysRange.lowerBound),
+                DesktopScanner.allowedDaysRange.upperBound
+            )
+            
+            guard clampedValue == minDaysOld else {
+                minDaysOld = clampedValue
+                return
+            }
+            
             refresh()
         }
     }
@@ -50,7 +64,8 @@ class DesktopScanner: ObservableObject {
                 options: [.skipsHiddenFiles]
             )
             
-            var newItems: [DesktopItem] = []
+            var filteredItems: [DesktopItem] = []
+            var allItems: [DesktopItem] = []
             
             for url in contents {
                 let resourceValues = try url.resourceValues(forKeys: [.isDirectoryKey, .contentModificationDateKey, .fileSizeKey])
@@ -70,20 +85,32 @@ class DesktopScanner: ObservableObject {
                     fileSize: resourceValues.fileSize ?? 0
                 )
                 
+                allItems.append(item)
+                
                 if item.daysOld >= minDaysOld {
-                    newItems.append(item)
+                    filteredItems.append(item)
                 }
             }
             
             DispatchQueue.main.async {
-                self.items = newItems
-                self.itemCount = newItems.count
+                self.items = filteredItems
+                self.itemCount = filteredItems.count
                 self.applySorting()
+                self.updateCleanlinessScore(with: allItems)
+                self.handleNotificationIfNeeded()
             }
             
         } catch {
             print("Erreur en lisant le Desktop : \(error)")
         }
+    }
+    
+    private func handleNotificationIfNeeded() {
+        guard items.count > fileCountThreshold else { return }
+        NotificationManager.shared.sendTooManyFilesNotification(
+            count: items.count,
+            threshold: fileCountThreshold
+        )
     }
     
     private func applySorting() {
@@ -101,6 +128,30 @@ class DesktopScanner: ObservableObject {
         case .ageLowest:
             items.sort { $0.daysOld < $1.daysOld }
         }
+    }
+    
+    private func updateCleanlinessScore(with desktopItems: [DesktopItem]) {
+        guard !desktopItems.isEmpty else {
+            cleanlinessScore = DeskCleanlinessScore(fileCount: 0, oldFileCount: 0, averageAge: 0)
+            return
+        }
+        
+        let fileCount = desktopItems.count
+        let oldFileCount = desktopItems.filter { $0.daysOld >= minDaysOld }.count
+        let averageAge = averageAge(for: desktopItems)
+        cleanlinessScore = DeskCleanlinessScore(
+            fileCount: fileCount,
+            oldFileCount: oldFileCount,
+            averageAge: averageAge
+        )
+    }
+    
+    private func averageAge(for items: [DesktopItem]) -> Double {
+        guard !items.isEmpty else { return 0 }
+        let totalDays = items.reduce(0.0) { partial, item in
+            partial + Double(item.daysOld)
+        }
+        return totalDays / Double(items.count)
     }
     
     // MARK: - Sélection
