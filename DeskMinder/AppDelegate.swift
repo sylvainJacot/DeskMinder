@@ -9,6 +9,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // On partage un scanner unique pour toute l’app
     let scanner = DesktopScanner()
     private var cancellables = Set<AnyCancellable>()
+    private var badgeColor: NSColor = .systemBlue
+    private var currentItemCount: Int = 0
     
     deinit {
         NotificationCenter.default.removeObserver(self)
@@ -43,6 +45,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
             .store(in: &cancellables)
         
+        scanner.$cleanlinessScore
+            .receive(on: RunLoop.main)
+            .sink { [weak self] score in
+                self?.updateBadgeColor(from: score)
+            }
+            .store(in: &cancellables)
+        
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleOpenPopoverRequest),
@@ -72,11 +81,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     private func updateStatusItemCount(_ count: Int) {
         guard let button = statusItem.button else { return }
-        button.image = makeStatusImage(count: count)
+        currentItemCount = count
+        button.image = makeStatusImage(count: count, badgeColor: badgeColor)
         button.image?.isTemplate = false
     }
     
-    private func makeStatusImage(count: Int) -> NSImage? {
+    private func makeStatusImage(count: Int, badgeColor: NSColor) -> NSImage? {
         let symbolName = count > 0 ? "tray.full" : "tray"
         guard let baseSymbol = NSImage(systemSymbolName: symbolName, accessibilityDescription: "DeskMinder") else {
             return nil
@@ -127,7 +137,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if count > 0 {
             let badgeRect = NSRect(x: trayRect.maxX + spacing, y: (height - baseBadgeHeight) / 2, width: badgeWidth, height: baseBadgeHeight)
             let circlePath = NSBezierPath(ovalIn: badgeRect)
-            NSColor.systemBlue.setFill()
+            badgeColor.setFill()
             circlePath.fill()
             
             let textRect = badgeRect.insetBy(dx: 3, dy: 4)
@@ -136,6 +146,30 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         image.unlockFocus()
         return image
+    }
+    
+    private func updateBadgeColor(from score: DeskCleanlinessScore?) {
+        let newColor = color(for: score)
+        
+        if badgeColor.isEqual(newColor) { return }
+        
+        badgeColor = newColor
+        updateStatusItemCount(currentItemCount)
+    }
+    
+    private func color(for score: DeskCleanlinessScore?) -> NSColor {
+        guard let value = score?.score else {
+            return .systemBlue
+        }
+        
+        switch value {
+        case 80...100:
+            return .systemGreen
+        case 50..<80:
+            return .systemOrange
+        default:
+            return .systemRed
+        }
     }
 }
 

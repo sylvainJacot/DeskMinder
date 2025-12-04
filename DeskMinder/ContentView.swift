@@ -4,12 +4,52 @@ import Quartz
 import QuickLookThumbnailing
 
 struct ContentView: View {
+    enum ThresholdUnit: String, CaseIterable, Identifiable {
+        case days
+        case months
+        case years
+        
+        var id: String { rawValue }
+        
+        var label: String {
+            switch self {
+            case .days:   return "jours"
+            case .months: return "mois"
+            case .years:  return "ans"
+            }
+        }
+        
+        func toDays(_ value: Int) -> Int {
+            switch self {
+            case .days:
+                return value
+            case .months:
+                return value * 30   // approximation suffisante
+            case .years:
+                return value * 365  // approximation suffisante
+            }
+        }
+        
+        func formatted(_ value: Int) -> String {
+            switch self {
+            case .days:
+                return value == 1 ? "1 jour" : "\(value) jours"
+            case .months:
+                return value == 1 ? "1 mois" : "\(value) mois"
+            case .years:
+                return value == 1 ? "1 an" : "\(value) ans"
+            }
+        }
+    }
+    
     @ObservedObject var scanner: DesktopScanner
     @State private var showingDeleteConfirmation = false
     @State private var showingFolderPicker = false
     @State private var showingNewFolderSheet = false
     @State private var spaceKeyMonitor: Any?
     @State private var focusedItemID: UUID?
+    @State private var thresholdValue: Int = 7
+    @State private var thresholdUnit: ThresholdUnit = .days
     private let quickLookCoordinator = QuickLookPreviewCoordinator()
     
     var body: some View {
@@ -61,6 +101,7 @@ struct ContentView: View {
         }
         .onAppear {
             installSpaceKeyMonitor()
+            syncFromScanner()
         }
         .onDisappear {
             removeSpaceKeyMonitor()
@@ -73,11 +114,37 @@ struct ContentView: View {
         }
     }
 
+    // MARK: - Threshold Helpers
+    
+    private func syncFromScanner() {
+        let days = scanner.minDaysOld
+        
+        if days % 365 == 0 && days >= 365 {
+            thresholdUnit = .years
+            thresholdValue = max(days / 365, 1)
+        } else if days % 30 == 0 && days >= 30 {
+            thresholdUnit = .months
+            thresholdValue = max(days / 30, 1)
+        } else {
+            thresholdUnit = .days
+            thresholdValue = max(days, 1)
+        }
+    }
+    
+    private func applyThresholdChange() {
+        let rawDays = thresholdUnit.toDays(thresholdValue)
+        let clampedDays = min(
+            max(rawDays, DesktopScanner.allowedDaysRange.lowerBound),
+            DesktopScanner.allowedDaysRange.upperBound
+        )
+        scanner.minDaysOld = clampedDays
+    }
+    
     
     // MARK: - Header
     
     private var header: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("DeskMinder")
                     .font(.title2)
@@ -100,36 +167,47 @@ struct ContentView: View {
                     .foregroundColor(.secondary)
             }
             
-            HStack {
-                Text("Seuil : \(scanner.minDaysOld) jours")
+            VStack(alignment: .leading, spacing: 6) {
+                Text("À partir de quand un fichier est-il considéré comme ancien ?")
                     .font(.subheadline)
                 
-                Spacer()
-                
-                Picker("Tri", selection: $scanner.sortOption) {
-                    ForEach(DesktopScanner.SortOption.allCases, id: \.self) { option in
-                        Text(option.rawValue).tag(option)
+                HStack(spacing: 8) {
+                    Text("Après")
+                    
+                    TextField("", value: $thresholdValue, formatter: NumberFormatter())
+                        .frame(width: 50)
+                        .multilineTextAlignment(.trailing)
+                        .textFieldStyle(.roundedBorder)
+                        .onChange(of: thresholdValue) { _ in
+                            applyThresholdChange()
+                        }
+                    
+                    Picker("", selection: $thresholdUnit) {
+                        ForEach(ThresholdUnit.allCases) { unit in
+                            Text(unit.label.capitalized).tag(unit)
+                        }
                     }
+                    .pickerStyle(.segmented)
+                    .frame(width: 200)
+                    .onChange(of: thresholdUnit) { _ in
+                        applyThresholdChange()
+                    }
+                    
+                    Spacer()
+                    
+                    Picker("Tri", selection: $scanner.sortOption) {
+                        ForEach(DesktopScanner.SortOption.allCases, id: \.self) { option in
+                            Text(option.rawValue).tag(option)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .frame(width: 180)
                 }
-                .pickerStyle(.menu)
-                .frame(width: 180)
+                
+                Text("Les fichiers présents sur le bureau depuis plus de \(thresholdUnit.formatted(thresholdValue)) seront proposés au rangement.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
-            
-            Slider(
-                value: Binding(
-                    get: { Double(scanner.minDaysOld) },
-                    set: { newValue in
-                        let roundedValue = Int(newValue.rounded())
-                        let clampedValue = min(
-                            max(roundedValue, DesktopScanner.allowedDaysRange.lowerBound),
-                            DesktopScanner.allowedDaysRange.upperBound
-                        )
-                        scanner.minDaysOld = clampedValue
-                    }
-                ),
-                in: Double(DesktopScanner.allowedDaysRange.lowerBound)...Double(DesktopScanner.allowedDaysRange.upperBound),
-                step: 1
-            )
         }
         .padding()
     }
