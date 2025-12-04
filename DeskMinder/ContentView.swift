@@ -71,7 +71,11 @@ struct ContentView: View {
         VStack(spacing: 0) {
             header
             
-
+            tabPicker
+                .padding(.horizontal)
+                .padding(.bottom, 12)
+            
+            Divider()
             
             if selectedTab == .toClean && !scanner.items.isEmpty {
                 selectionToolbar
@@ -96,7 +100,7 @@ struct ContentView: View {
                                         scanner.toggleSelection(item.id)
                                     },
                                     onFocus: {
-                                        focusedItemID = item.id
+                                        focusItem(item.id)
                                     },
                                     isFocused: focusedItemID == item.id,
                                     isIgnored: scanner.isIgnored(item),
@@ -120,7 +124,7 @@ struct ContentView: View {
                                     isSelected: false,
                                     onToggleSelection: { },
                                     onFocus: {
-                                        focusedItemID = item.id
+                                        focusItem(item.id)
                                     },
                                     isFocused: focusedItemID == item.id,
                                     isIgnored: true,
@@ -148,8 +152,8 @@ struct ContentView: View {
             NewFolderSheet(scanner: scanner)
         }
         .onAppear {
-            installSpaceKeyMonitor()
             syncFromScanner()
+            installSpaceKeyMonitor()
         }
         .onDisappear {
             removeSpaceKeyMonitor()
@@ -271,6 +275,15 @@ struct ContentView: View {
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
     }
+    
+    private var tabPicker: some View {
+        Picker("", selection: $selectedTab) {
+            ForEach(ListTab.allCases) { tab in
+                Text(tab.title).tag(tab)
+            }
+        }
+        .pickerStyle(.segmented)
+    }
 
     // MARK: - Cleanliness Score
     
@@ -278,20 +291,22 @@ struct ContentView: View {
     private func cleanlinessCard(for score: DeskCleanlinessScore) -> some View {
         let accentColor = cleanlinessAccentColor(for: score.score)
         
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .lastTextBaseline) {
+        HStack {
+            VStack(alignment: .leading) {
                 Text("Indice de propreté du bureau :")
                     .font(.headline)
+                    .padding(3)
                 Text("\(score.score)/100")
                     .font(.title3)
                     .fontWeight(.bold)
                     .foregroundColor(accentColor)
+                ProgressView(value: Double(score.score), total: 100)
+                    .tint(accentColor)
             }
             
-            ProgressView(value: Double(score.score), total: 100)
-                .tint(accentColor)
             
-            HStack {
+            
+            VStack(alignment: .leading) {
                 Text(fileCountLabel(score.fileCount))
                 Spacer()
                 Text(oldFileCountLabel(score.oldFileCount))
@@ -437,6 +452,11 @@ struct ContentView: View {
         return scanner.ignoredItems.first(where: { $0.id == id })
     }
     
+    private func focusItem(_ id: UUID) {
+        NSApp.keyWindow?.makeFirstResponder(nil)
+        focusedItemID = id
+    }
+    
     private func showQuickLookPanel(with urls: [URL]) {
         quickLookCoordinator.updateItems(urls)
         
@@ -468,7 +488,7 @@ struct ContentView: View {
               panel.isVisible else { return }
         panel.orderOut(nil)
     }
-    
+
     private func installSpaceKeyMonitor() {
         guard spaceKeyMonitor == nil else { return }
         spaceKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
