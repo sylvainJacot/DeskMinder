@@ -4,6 +4,20 @@ import Quartz
 import QuickLookThumbnailing
 
 struct ContentView: View {
+    enum ListTab: String, CaseIterable, Identifiable {
+        case toClean
+        case ignored
+        
+        var id: String { rawValue }
+        
+        var title: String {
+            switch self {
+            case .toClean: return "À ranger"
+            case .ignored: return "Ignorés"
+            }
+        }
+    }
+    
     enum ThresholdUnit: String, CaseIterable, Identifiable {
         case days
         case months
@@ -48,43 +62,77 @@ struct ContentView: View {
     @State private var showingNewFolderSheet = false
     @State private var spaceKeyMonitor: Any?
     @State private var focusedItemID: UUID?
+    @State private var selectedTab: ListTab = .toClean
     @State private var thresholdValue: Int = 7
     @State private var thresholdUnit: ThresholdUnit = .days
     private let quickLookCoordinator = QuickLookPreviewCoordinator()
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(spacing: 0) {
             header
             
-            if let score = scanner.cleanlinessScore {
-                cleanlinessCard(for: score)
-            }
+
             
-            Divider()
-            
-            if !scanner.items.isEmpty {
+            if selectedTab == .toClean && !scanner.items.isEmpty {
                 selectionToolbar
                 Divider()
             }
             
-            List {
-                ForEach(scanner.items) { item in
-                    DesktopItemRow(
-                        item: item,
-                        isSelected: scanner.selectedItems.contains(item.id),
-                        onToggleSelection: {
-                            scanner.toggleSelection(item.id)
-                        },
-                        onFocus: {
-                            focusedItemID = item.id
-                        },
-                        isFocused: focusedItemID == item.id
-                    )
+            ScrollView {
+                VStack(alignment: .leading, spacing: 8) {
+                    switch selectedTab {
+                    case .toClean:
+                        if scanner.items.isEmpty {
+                            Text("Aucun fichier à ranger 🎉")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .padding(.top, 8)
+                        } else {
+                            ForEach(scanner.items) { item in
+                                DesktopItemRow(
+                                    item: item,
+                                    isSelected: scanner.selectedItems.contains(item.id),
+                                    onToggleSelection: {
+                                        scanner.toggleSelection(item.id)
+                                    },
+                                    onFocus: {
+                                        focusedItemID = item.id
+                                    },
+                                    isFocused: focusedItemID == item.id,
+                                    isIgnored: scanner.isIgnored(item),
+                                    onToggleIgnored: {
+                                        scanner.toggleIgnored(item)
+                                    }
+                                )
+                            }
+                        }
+                        
+                    case .ignored:
+                        if scanner.ignoredItems.isEmpty {
+                            Text("Aucun fichier ignoré.")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .padding(.top, 8)
+                        } else {
+                            ForEach(scanner.ignoredItems) { item in
+                                DesktopItemRow(
+                                    item: item,
+                                    isSelected: false,
+                                    onToggleSelection: { },
+                                    onFocus: {
+                                        focusedItemID = item.id
+                                    },
+                                    isFocused: focusedItemID == item.id,
+                                    isIgnored: true,
+                                    onToggleIgnored: {
+                                        scanner.toggleIgnored(item)
+                                    }
+                                )
+                            }
+                        }
+                    }
                 }
-            }
-            
-            if scanner.items.isEmpty {
-                emptyState
+                .padding([.horizontal, .bottom])
             }
         }
         .frame(minWidth: 500, minHeight: 300)
@@ -113,7 +161,7 @@ struct ContentView: View {
             refreshQuickLookSelection()
         }
     }
-
+    
     // MARK: - Threshold Helpers
     
     private func syncFromScanner() {
@@ -144,11 +192,17 @@ struct ContentView: View {
     // MARK: - Header
     
     private var header: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text("DeskMinder")
-                    .font(.title2)
+                    .font(.title3)
                     .fontWeight(.semibold)
+                
+                if !scanner.items.isEmpty {
+                    Text("\(scanner.items.count) fichier(s) à ranger")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
                 
                 Spacer()
                 
@@ -158,24 +212,19 @@ struct ContentView: View {
                     Image(systemName: "arrow.clockwise")
                 }
                 .buttonStyle(.borderless)
-                .help("Rafraîchir la liste")
-            }
-            
-            if !scanner.items.isEmpty {
-                Text("\(scanner.items.count) fichier(s) à ranger")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                .help("Rafraîchir")
             }
             
             VStack(alignment: .leading, spacing: 6) {
                 Text("À partir de quand un fichier est-il considéré comme ancien ?")
                     .font(.subheadline)
+                    .multilineTextAlignment(.leading)
                 
                 HStack(spacing: 8) {
                     Text("Après")
                     
                     TextField("", value: $thresholdValue, formatter: NumberFormatter())
-                        .frame(width: 50)
+                        .frame(width: 60)
                         .multilineTextAlignment(.trailing)
                         .textFieldStyle(.roundedBorder)
                         .onChange(of: thresholdValue) { _ in
@@ -188,28 +237,39 @@ struct ContentView: View {
                         }
                     }
                     .pickerStyle(.segmented)
-                    .frame(width: 200)
                     .onChange(of: thresholdUnit) { _ in
                         applyThresholdChange()
                     }
                     
                     Spacer()
-                    
-                    Picker("Tri", selection: $scanner.sortOption) {
-                        ForEach(DesktopScanner.SortOption.allCases, id: \.self) { option in
-                            Text(option.rawValue).tag(option)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .frame(width: 180)
                 }
                 
                 Text("Les fichiers présents sur le bureau depuis plus de \(thresholdUnit.formatted(thresholdValue)) seront proposés au rangement.")
                     .font(.caption)
                     .foregroundColor(.secondary)
+                    .multilineTextAlignment(.leading)
+            }
+            
+            HStack(spacing: 12) {
+                Text("Filtres actifs : âge ≥ \(thresholdUnit.formatted(thresholdValue))")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                
+                Picker("Tri", selection: $scanner.sortOption) {
+                    ForEach(DesktopScanner.SortOption.allCases, id: \.self) { option in
+                        Text(option.rawValue).tag(option)
+                    }
+                }
+                .pickerStyle(.menu)
+            }
+            
+            if let score = scanner.cleanlinessScore {
+                cleanlinessCard(for: score)
             }
         }
         .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: - Cleanliness Score
@@ -251,7 +311,6 @@ struct ContentView: View {
                 .stroke(Color.black.opacity(0.05), lineWidth: 0.5)
         )
         .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 4)
-        .padding()
     }
     
     private func cleanlinessAccentColor(for score: Int) -> Color {
@@ -272,6 +331,8 @@ struct ContentView: View {
     private func oldFileCountLabel(_ count: Int) -> String {
         count > 1 ? "\(count) fichiers anciens" : "\(count) fichier ancien"
     }
+    
+    
     
     // MARK: - Selection Toolbar
     
@@ -324,25 +385,6 @@ struct ContentView: View {
         .background(Color(nsColor: .controlBackgroundColor))
     }
     
-    // MARK: - Empty State
-    
-    private var emptyState: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 48))
-                .foregroundColor(.green)
-            
-            Text("Aucun fichier à ranger 🎉")
-                .font(.headline)
-            
-            Text("Votre bureau est bien organisé !")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding()
-    }
-    
     // MARK: - Actions
     
     private func handleMoveToTrash() {
@@ -374,16 +416,25 @@ struct ContentView: View {
     
     private func currentSelectionURLs() -> [URL] {
         if let focusedId = focusedItemID,
-           let focusedItem = scanner.items.first(where: { $0.id == focusedId }) {
+           let focusedItem = item(for: focusedId) {
             return [focusedItem.url]
         }
         
-        let selected = scanner.items.filter { scanner.selectedItems.contains($0.id) }
-        if !selected.isEmpty {
-            return selected.map { $0.url }
+        if selectedTab == .toClean {
+            let selected = scanner.items.filter { scanner.selectedItems.contains($0.id) }
+            if !selected.isEmpty {
+                return selected.map { $0.url }
+            }
         }
         
         return []
+    }
+    
+    private func item(for id: UUID) -> DesktopItem? {
+        if let match = scanner.items.first(where: { $0.id == id }) {
+            return match
+        }
+        return scanner.ignoredItems.first(where: { $0.id == id })
     }
     
     private func showQuickLookPanel(with urls: [URL]) {
@@ -459,6 +510,8 @@ struct DesktopItemRow: View {
     let onToggleSelection: () -> Void
     let onFocus: () -> Void
     let isFocused: Bool
+    let isIgnored: Bool
+    let onToggleIgnored: () -> Void
     
     private var formattedDate: String {
         let formatter = DateFormatter()
@@ -491,14 +544,23 @@ struct DesktopItemRow: View {
             
             Spacer()
             
-            VStack(alignment: .trailing) {
-                Text("\(item.daysOld) j")
-                    .font(.headline)
-                    .foregroundColor(item.daysOld > 30 ? .red : .primary)
+            HStack(spacing: 8) {
+                VStack(alignment: .trailing) {
+                    Text("\(item.daysOld) j")
+                        .font(.headline)
+                        .foregroundColor(item.daysOld > 30 ? .red : .primary)
+                    
+                    Text("sur le bureau")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
                 
-                Text("sur le bureau")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
+                Button(action: onToggleIgnored) {
+                    Image(systemName: isIgnored ? "star.fill" : "star")
+                        .foregroundColor(isIgnored ? .yellow : .secondary)
+                }
+                .buttonStyle(.plain)
+                .help(isIgnored ? "Autoriser à nouveau le rangement" : "Ne jamais proposer de ranger ce fichier")
             }
         }
         .contentShape(Rectangle())
@@ -518,6 +580,10 @@ struct DesktopItemRow: View {
             }
             
             Divider()
+            
+            Button(isIgnored ? "Autoriser à nouveau le rangement" : "Ne jamais proposer de ranger ce fichier") {
+                onToggleIgnored()
+            }
             
             Button("Sélectionner") {
                 onToggleSelection()

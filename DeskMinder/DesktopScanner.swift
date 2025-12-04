@@ -5,10 +5,13 @@ class DesktopScanner: ObservableObject {
     static let allowedDaysRange: ClosedRange<Int> = 1...2000
     
     @Published var items: [DesktopItem] = []
+    @Published var ignoredItems: [DesktopItem] = []
     @Published private(set) var itemCount: Int = 0
+    @Published private(set) var ignoredItemPaths: Set<String> = []
     @Published var selectedItems: Set<UUID> = []
     @Published var cleanlinessScore: DeskCleanlinessScore?
     let fileCountThreshold = 15
+    private let ignoredDefaultsKey = "ignoredDesktopItemPaths"
     
     /// Seuil minimal en jours pour considérer un fichier comme "ancien"
     @Published var minDaysOld: Int = 7 {
@@ -46,6 +49,7 @@ class DesktopScanner: ObservableObject {
     private let fileManager = FileManager.default
     
     init() {
+        loadIgnoredItems()
         refresh()
     }
     
@@ -87,13 +91,16 @@ class DesktopScanner: ObservableObject {
                 
                 allItems.append(item)
                 
-                if item.daysOld >= minDaysOld {
+                if item.daysOld >= minDaysOld && !ignoredItemPaths.contains(item.url.path) {
                     filteredItems.append(item)
                 }
             }
             
+            let ignored = allItems.filter { self.ignoredItemPaths.contains($0.url.path) }
+            
             DispatchQueue.main.async {
                 self.items = filteredItems
+                self.ignoredItems = ignored
                 self.itemCount = filteredItems.count
                 self.applySorting()
                 self.updateCleanlinessScore(with: allItems)
@@ -178,6 +185,35 @@ class DesktopScanner: ObservableObject {
     
     var selectedCount: Int {
         selectedItems.count
+    }
+    
+    // MARK: - Ignored Items
+    
+    func isIgnored(_ item: DesktopItem) -> Bool {
+        ignoredItemPaths.contains(item.url.path)
+    }
+    
+    func toggleIgnored(_ item: DesktopItem) {
+        let path = item.url.path
+        
+        if ignoredItemPaths.contains(path) {
+            ignoredItemPaths.remove(path)
+        } else {
+            ignoredItemPaths.insert(path)
+        }
+        
+        saveIgnoredItems()
+        refresh()
+    }
+    
+    private func loadIgnoredItems() {
+        let stored = UserDefaults.standard.stringArray(forKey: ignoredDefaultsKey) ?? []
+        ignoredItemPaths = Set(stored)
+    }
+    
+    private func saveIgnoredItems() {
+        let array = Array(ignoredItemPaths)
+        UserDefaults.standard.set(array, forKey: ignoredDefaultsKey)
     }
     
     // MARK: - Actions groupées
