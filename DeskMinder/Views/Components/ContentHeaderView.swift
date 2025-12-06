@@ -86,13 +86,6 @@ struct ContentHeaderView: View {
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            
-            Picker("Tri", selection: $scanner.sortOption) {
-                ForEach(DesktopScanner.SortOption.allCases, id: \.self) { option in
-                    Text(option.rawValue).tag(option)
-                }
-            }
-            .pickerStyle(.menu)
         }
     }
     

@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct ContentExplorerView: View {
     @ObservedObject var scanner: DesktopScanner
@@ -8,6 +9,8 @@ struct ContentExplorerView: View {
     @Binding var showingNewFolderSheet: Bool
     @Binding var showingDeleteConfirmation: Bool
     var focusItem: (UUID) -> Void
+    
+    @State private var columnLayout = FinderColumnLayout()
     
     var body: some View {
         VStack(spacing: 0) {
@@ -22,19 +25,33 @@ struct ContentExplorerView: View {
                 Divider()
             }
             
-            ScrollView {
-                VStack(alignment: .leading, spacing: 8) {
-                    switch selectedTab {
-                    case .toClean:
-                        toCleanList
-                    case .ignored:
-                        ignoredList
+            ZStack {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                
+                VStack(spacing: 0) {
+                    listHeader
+                    ScrollView {
+                        VStack(spacing: 0) {
+                            switch selectedTab {
+                            case .toClean:
+                                toCleanList
+                            case .ignored:
+                                ignoredList
+                            }
+                        }
+                        .padding(.vertical, 4)
                     }
+                    .scrollIndicators(.visible)
                 }
-                .padding([.horizontal, .bottom])
             }
+            .padding(.horizontal)
+            .padding(.vertical, 12)
         }
+        .environment(\.columnLayout, columnLayout)
     }
+    
+    // MARK: - Header & Toolbar
     
     private var tabPicker: some View {
         Picker("", selection: $selectedTab) {
@@ -91,34 +108,39 @@ struct ContentExplorerView: View {
         }
         .padding(.horizontal)
         .padding(.vertical, 8)
-        .background(Color(nsColor: .controlBackgroundColor))
+        .background(
+            LinearGradient(colors: [
+                Color(nsColor: .controlBackgroundColor),
+                Color(nsColor: .controlBackgroundColor).opacity(0.6)
+            ], startPoint: .top, endPoint: .bottom)
+        )
+    }
+    
+    // MARK: - Lists
+    
+    private var listHeader: some View {
+        Group {
+            if currentItems.isEmpty {
+                EmptyView()
+            } else {
+                FinderColumnHeader(sortOption: $scanner.sortOption,
+                                   columnLayout: $columnLayout)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 6)
+            }
+        }
+    }
+    
+    private var currentItems: [DesktopItem] {
+        selectedTab == .ignored ? scanner.ignoredItems : scanner.items
     }
     
     private var toCleanList: some View {
         Group {
             if scanner.items.isEmpty {
-                Text("Aucun fichier à ranger 🎉")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .padding(.top, 8)
+                emptyState(text: "Aucun fichier à ranger 🎉")
             } else {
-                ForEach(scanner.items) { item in
-                    DesktopItemRow(
-                        item: item,
-                        isSelected: scanner.selectedItems.contains(item.id),
-                        onToggleSelection: {
-                            scanner.toggleSelection(item.id)
-                        },
-                        onFocus: {
-                            focusItem(item.id)
-                        },
-                        isFocused: focusedItemID == item.id,
-                        isIgnored: scanner.isIgnored(item),
-                        onToggleIgnored: {
-                            scanner.toggleIgnored(item)
-                        }
-                    )
-                }
+                finderRows(for: scanner.items, allowSelection: true)
             }
         }
     }
@@ -126,27 +148,59 @@ struct ContentExplorerView: View {
     private var ignoredList: some View {
         Group {
             if scanner.ignoredItems.isEmpty {
-                Text("Aucun fichier ignoré.")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .padding(.top, 8)
+                emptyState(text: "Aucun fichier ignoré.")
             } else {
-                ForEach(scanner.ignoredItems) { item in
-                    DesktopItemRow(
-                        item: item,
-                        isSelected: false,
-                        onToggleSelection: { },
-                        onFocus: {
-                            focusItem(item.id)
-                        },
-                        isFocused: focusedItemID == item.id,
-                        isIgnored: true,
-                        onToggleIgnored: {
-                            scanner.toggleIgnored(item)
-                        }
-                    )
+                finderRows(for: scanner.ignoredItems, allowSelection: false)
+            }
+        }
+    }
+
+    private func finderRows(for items: [DesktopItem], allowSelection: Bool) -> some View {
+        LazyVStack(spacing: 0) {
+            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                DesktopItemRow(
+                    item: item,
+                    isSelected: allowSelection ? scanner.selectedItems.contains(item.id) : false,
+                    onToggleSelection: {
+                        guard allowSelection else { return }
+                        scanner.toggleSelection(item.id)
+                    },
+                    onFocus: {
+                        focusItem(item.id)
+                    },
+                    isFocused: focusedItemID == item.id,
+                    isIgnored: allowSelection ? scanner.isIgnored(item) : true,
+                    onToggleIgnored: {
+                        scanner.toggleIgnored(item)
+                    }
+                )
+                
+                if index < items.count - 1 {
+                    FinderDivider()
                 }
             }
         }
+        .padding(.horizontal, 4)
+        .padding(.vertical, 4)
+    }
+    
+    // MARK: - Helpers
+    
+    private func emptyState(text: String) -> some View {
+        Text(text)
+            .font(.subheadline)
+            .foregroundColor(.secondary)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.vertical, 24)
+    }
+}
+
+private struct FinderDivider: View {
+    var body: some View {
+        Rectangle()
+            .fill(Color(nsColor: .separatorColor).opacity(0.35))
+            .frame(height: 0.5)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 2)
     }
 }

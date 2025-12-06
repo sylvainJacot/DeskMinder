@@ -10,66 +10,79 @@ struct DesktopItemRow: View {
     let isIgnored: Bool
     let onToggleIgnored: () -> Void
     
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.columnLayout) private var columnLayout
+    @State private var isHovered = false
+    
     private var formattedDate: String {
+        Self.dateFormatter.string(from: item.lastModified)
+    }
+    
+    private static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
         formatter.timeStyle = .short
-        return formatter.string(from: item.lastModified)
+        return formatter
+    }()
+    
+    private var titleColor: Color {
+        isSelected ? .white : .primary
+    }
+    
+    private var metadataColor: Color {
+        isSelected ? Color.white.opacity(0.85) : Color.secondary
+    }
+    
+    private var selectionBackground: Color {
+        guard isSelected else { return .clear }
+        return colorScheme == .dark
+            ? Color.accentColor.opacity(0.55)
+            : Color.accentColor.opacity(0.9)
+    }
+    
+    private var hoverBackground: Color {
+        guard !isSelected else { return .clear }
+        let baseOpacity = colorScheme == .dark ? 0.25 : 0.07
+        return Color.primary.opacity(isHovered ? baseOpacity : 0)
+    }
+    
+    private var focusBorderColor: Color {
+        guard isFocused else { return .clear }
+        return colorScheme == .dark ? Color.accentColor.opacity(0.8) : Color.accentColor.opacity(0.6)
     }
     
     var body: some View {
-        HStack(spacing: 12) {
-            Button {
-                onToggleSelection()
-            } label: {
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .foregroundColor(isSelected ? .accentColor : .secondary)
-            }
-            .buttonStyle(.borderless)
-            
-            FileThumbnailView(url: item.url)
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text(item.name)
-                    .font(.body)
-                    .lineLimit(1)
-                
-                Text("Modifié le \(formattedDate) (\(item.formattedFileSize))")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            
-            Spacer()
-            
-            HStack(spacing: 8) {
-                VStack(alignment: .trailing) {
-                    Text("\(item.daysOld) j")
-                        .font(.headline)
-                        .foregroundColor(item.daysOld > 30 ? .red : .primary)
-                    
-                    Text("sur le bureau")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                }
-                
-                Button(action: onToggleIgnored) {
-                    Image(systemName: isIgnored ? "star.fill" : "star")
-                        .foregroundColor(isIgnored ? .yellow : .secondary)
-                }
-                .buttonStyle(.plain)
-                .help(isIgnored ? "Autoriser à nouveau le rangement" : "Ne jamais proposer de ranger ce fichier")
-            }
+        HStack(spacing: 0) {
+            nameColumn
+            dateColumn
+            sizeColumn
+            typeColumn
+            ignoreToggle
+                .frame(width: FinderLayoutConstants.trailingAccessoryWidth, alignment: .center)
         }
-        .contentShape(Rectangle())
+        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .frame(minHeight: 34)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(selectionBackground)
+        )
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(hoverBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(focusBorderColor, lineWidth: isFocused ? 1 : 0)
+        )
+        .onHover { hovering in
+            isHovered = hovering
+        }
         .highPriorityGesture(
             TapGesture().onEnded {
                 onFocus()
             }
-        )
-        .padding(6)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(isFocused ? Color.accentColor : Color.clear, lineWidth: 1)
         )
         .contextMenu {
             Button("Afficher dans le Finder") {
@@ -86,7 +99,72 @@ struct DesktopItemRow: View {
                 onToggleSelection()
             }
         }
-        .padding(.vertical, 4)
+    }
+    
+    // MARK: - Columns
+    
+    private var nameColumn: some View {
+        HStack(spacing: 8) {
+            selectionButton
+            FileThumbnailView(url: item.url)
+                .frame(width: 32, height: 32)
+            Text(item.name)
+                .font(.system(size: 14))
+                .foregroundStyle(titleColor)
+                .lineLimit(1)
+        }
+        .frame(width: columnLayout.width(for: .name), alignment: .leading)
+    }
+    
+    private var dateColumn: some View {
+        Text(formattedDate)
+            .font(.system(size: 13))
+            .foregroundStyle(metadataColor)
+            .frame(width: columnLayout.width(for: .date), alignment: .leading)
+    }
+    
+    private var sizeColumn: some View {
+        Text(item.formattedFileSize)
+            .font(.system(size: 13, weight: .regular, design: .monospaced))
+            .foregroundStyle(metadataColor)
+            .frame(width: columnLayout.width(for: .size), alignment: .trailing)
+    }
+    
+    private var typeColumn: some View {
+        Text(typeLabel)
+            .font(.system(size: 13))
+            .foregroundStyle(metadataColor)
+            .frame(width: columnLayout.width(for: .type), alignment: .leading)
+    }
+    
+    private var typeLabel: String {
+        let ext = item.fileExtension
+        if ext.isEmpty {
+            return "Fichier"
+        }
+        return ext.uppercased()
+    }
+    
+    // MARK: - Controls
+    
+    private var selectionButton: some View {
+        Button {
+            onToggleSelection()
+        } label: {
+            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(isSelected ? Color.white : Color.secondary)
+        }
+        .buttonStyle(.borderless)
+        .help(isSelected ? "Retirer de la sélection" : "Sélectionner")
+    }
+    
+    private var ignoreToggle: some View {
+        Button(action: onToggleIgnored) {
+            Image(systemName: isIgnored ? "star.fill" : "star")
+                .foregroundStyle(isSelected ? Color.white : (isIgnored ? Color.yellow : Color.secondary))
+        }
+        .buttonStyle(.plain)
+        .help(isIgnored ? "Autoriser à nouveau le rangement" : "Ne jamais proposer de ranger ce fichier")
     }
 }
-

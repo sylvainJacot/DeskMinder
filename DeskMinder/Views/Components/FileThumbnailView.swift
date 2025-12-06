@@ -7,23 +7,32 @@ struct FileThumbnailView: View {
     private let size: CGFloat = 32
     
     @State private var thumbnail: NSImage?
+    @State private var defaultIcon: NSImage = NSImage()
     @State private var isGenerating = false
     
     var body: some View {
-        Image(nsImage: thumbnail ?? fallbackIcon)
+        Image(nsImage: thumbnail ?? defaultIcon)
             .resizable()
             .scaledToFit()
             .frame(width: size, height: size)
-            .cornerRadius(4)
-            .onAppear(perform: generateThumbnailIfNeeded)
+            .cornerRadius(6)
+            .shadow(color: Color.black.opacity(0.08), radius: 2, x: 0, y: 1)
+            .padding(.leading, 4)
+            .onAppear {
+                loadDefaultIcon()
+                generateThumbnailIfNeeded()
+            }
             .onChange(of: url) { _ in
                 thumbnail = nil
+                loadDefaultIcon()
                 generateThumbnailIfNeeded()
             }
     }
     
-    private var fallbackIcon: NSImage {
-        NSWorkspace.shared.icon(forFile: url.path)
+    private func loadDefaultIcon() {
+        let icon = NSWorkspace.shared.icon(forFile: url.path)
+        icon.size = NSSize(width: size, height: size)
+        defaultIcon = icon
     }
     
     private func generateThumbnailIfNeeded() {
@@ -48,4 +57,3 @@ struct FileThumbnailView: View {
         }
     }
 }
-

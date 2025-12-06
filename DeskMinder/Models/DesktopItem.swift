@@ -17,6 +17,10 @@ struct DesktopItem: Identifiable {
         DesktopItem.sizeFormatter.string(fromByteCount: Int64(fileSize))
     }
     
+    var fileExtension: String {
+        url.pathExtension.lowercased()
+    }
+    
     private static let sizeFormatter: ByteCountFormatter = {
         let formatter = ByteCountFormatter()
         formatter.allowedUnits = [.useKB, .useMB, .useGB]

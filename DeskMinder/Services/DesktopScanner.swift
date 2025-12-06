@@ -38,6 +38,10 @@ class DesktopScanner: ObservableObject {
         case dateNewest = "Plus récent"
         case ageHighest = "Âge (décroissant)"
         case ageLowest = "Âge (croissant)"
+        case sizeAsc = "Taille (croissant)"
+        case sizeDesc = "Taille (décroissant)"
+        case typeAsc = "Type (A-Z)"
+        case typeDesc = "Type (Z-A)"
     }
     
     @Published var sortOption: SortOption = .dateOldest {
@@ -134,6 +138,18 @@ class DesktopScanner: ObservableObject {
             items.sort { $0.daysOld > $1.daysOld }
         case .ageLowest:
             items.sort { $0.daysOld < $1.daysOld }
+        case .sizeAsc:
+            items.sort { $0.fileSize < $1.fileSize }
+        case .sizeDesc:
+            items.sort { $0.fileSize > $1.fileSize }
+        case .typeAsc:
+            items.sort {
+                $0.fileExtension.localizedCaseInsensitiveCompare($1.fileExtension) == .orderedAscending
+            }
+        case .typeDesc:
+            items.sort {
+                $0.fileExtension.localizedCaseInsensitiveCompare($1.fileExtension) == .orderedDescending
+            }
         }
     }
     
