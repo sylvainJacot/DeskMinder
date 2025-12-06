@@ -44,4 +44,30 @@ extension DeskCleanlinessScore {
         formatter.minimumFractionDigits = averageAge < 10 ? 1 : 0
         return formatter.string(from: NSNumber(value: averageAge)) ?? String(format: "%.1f", averageAge)
     }
+    
+    var percentageFormatted: String {
+        "\(score)%"
+    }
+    
+    var qualitativeLabel: String {
+        switch score {
+        case 80...100:
+            return "Propre"
+        case 50..<80:
+            return "À ranger"
+        default:
+            return "Très encombré"
+        }
+    }
+    
+    var localizedDescription: String {
+        switch score {
+        case 80...100:
+            return "Votre bureau est sous contrôle. Continuez ainsi !"
+        case 50..<80:
+            return "Quelques fichiers méritent un coup d'œil."
+        default:
+            return "Un tri s'impose pour retrouver de l'espace."
+        }
+    }
 }

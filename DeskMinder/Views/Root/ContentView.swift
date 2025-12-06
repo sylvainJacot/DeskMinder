@@ -62,17 +62,18 @@ struct ContentView: View {
     @State private var spaceKeyMonitor: Any?
     @State private var focusedItemID: UUID?
     @State private var selectedTab: ListTab = .toClean
-    @State private var thresholdValue: Int = 7
+    @State private var thresholdValue: Double = 7
     @State private var thresholdUnit: ThresholdUnit = .days
+    @AppStorage("autoCleanEnabled") private var autoCleanEnabled = false
     private let quickLookCoordinator = QuickLookPreviewCoordinator()
     
     var body: some View {
-        VStack(spacing: 0) {
-            ContentHeaderView(
+        HSplitView {
+            MainSidebarView(
                 scanner: scanner,
                 thresholdValue: $thresholdValue,
                 thresholdUnit: $thresholdUnit,
-                onThresholdChange: applyThresholdChange
+                autoCleanEnabled: $autoCleanEnabled
             )
             ContentExplorerView(
                 scanner: scanner,
@@ -84,7 +85,7 @@ struct ContentView: View {
                 focusItem: focusItem(_:)
             )
         }
-        .frame(minWidth: 500, minHeight: 300)
+        .frame(minWidth: 760, minHeight: 420)
         .alert("Confirmer la suppression", isPresented: $showingDeleteConfirmation) {
             Button("Annuler", role: .cancel) { }
             Button("Mettre à la corbeille", role: .destructive) {
@@ -109,6 +110,12 @@ struct ContentView: View {
         .onChange(of: focusedItemID) { _ in
             refreshQuickLookSelection()
         }
+        .onChange(of: thresholdValue) { _ in
+            applyThresholdChange()
+        }
+        .onChange(of: thresholdUnit) { _ in
+            applyThresholdChange()
+        }
     }
     
     // MARK: - Threshold Helpers
@@ -118,23 +125,25 @@ struct ContentView: View {
         
         if days % 365 == 0 && days >= 365 {
             thresholdUnit = .years
-            thresholdValue = max(days / 365, 1)
+            thresholdValue = Double(max(days / 365, 1))
         } else if days % 30 == 0 && days >= 30 {
             thresholdUnit = .months
-            thresholdValue = max(days / 30, 1)
+            thresholdValue = Double(max(days / 30, 1))
         } else {
             thresholdUnit = .days
-            thresholdValue = max(days, 1)
+            thresholdValue = Double(max(days, 1))
         }
     }
     
     private func applyThresholdChange() {
-        let rawDays = thresholdUnit.toDays(thresholdValue)
+        let roundedValue = Int(thresholdValue.rounded())
+        let rawDays = thresholdUnit.toDays(roundedValue)
         let clampedDays = min(
             max(rawDays, DesktopScanner.allowedDaysRange.lowerBound),
             DesktopScanner.allowedDaysRange.upperBound
         )
         scanner.minDaysOld = clampedDays
+        thresholdValue = Double(roundedValue)
     }
     // MARK: - Actions
     

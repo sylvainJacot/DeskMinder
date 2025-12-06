@@ -4,6 +4,10 @@ import Combine
 class DesktopScanner: ObservableObject {
     static let allowedDaysRange: ClosedRange<Int> = 1...2000
     
+    enum ScannerActionError: Error {
+        case recommendedFolderUnavailable
+    }
+    
     @Published var items: [DesktopItem] = []
     @Published var ignoredItems: [DesktopItem] = []
     @Published private(set) var itemCount: Int = 0
@@ -203,6 +207,44 @@ class DesktopScanner: ObservableObject {
         selectedItems.count
     }
     
+    var totalItemsCount: Int {
+        items.count
+    }
+    
+    var selectedItemsCount: Int {
+        selectedItems.count
+    }
+    
+    var ignoredItemsCount: Int {
+        ignoredItems.count
+    }
+    
+    private var totalSizeBytes: Int64 {
+        items.reduce(Int64(0)) { partial, item in
+            partial + Int64(item.fileSize)
+        }
+    }
+    
+    var formattedTotalSize: String {
+        ByteCountFormatter.string(fromByteCount: totalSizeBytes, countStyle: .file)
+    }
+    
+    var oldestItemAgeDescription: String? {
+        guard let maxDays = items.map(\.daysOld).max() else { return nil }
+        switch maxDays {
+        case 0:
+            return "Aujourd'hui"
+        case 1:
+            return "1 jour"
+        default:
+            return "\(maxDays) jours"
+        }
+    }
+    
+    var currentScore: DeskCleanlinessScore? {
+        cleanlinessScore
+    }
+    
     // MARK: - Ignored Items
     
     func isIgnored(_ item: DesktopItem) -> Bool {
@@ -309,5 +351,12 @@ class DesktopScanner: ObservableObject {
         } catch {
             return .failure(error)
         }
+    }
+    
+    func moveSelectionToRecommendedFolder() -> Result<URL, Error> {
+        guard let documents = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            return .failure(ScannerActionError.recommendedFolderUnavailable)
+        }
+        return createFolderAndMove(folderName: "DeskMinder - Tri", in: documents)
     }
 }
