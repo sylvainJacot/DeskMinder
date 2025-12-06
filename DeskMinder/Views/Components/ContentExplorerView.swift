@@ -8,7 +8,6 @@ struct ContentExplorerView: View {
     @Binding var showingFolderPicker: Bool
     @Binding var showingNewFolderSheet: Bool
     @Binding var showingDeleteConfirmation: Bool
-    var focusItem: (UUID) -> Void
     
     
     init(
@@ -17,8 +16,7 @@ struct ContentExplorerView: View {
         focusedItemID: Binding<UUID?>,
         showingFolderPicker: Binding<Bool>,
         showingNewFolderSheet: Binding<Bool>,
-        showingDeleteConfirmation: Binding<Bool>,
-        focusItem: @escaping (UUID) -> Void
+        showingDeleteConfirmation: Binding<Bool>
     ) {
         self._scanner = ObservedObject(wrappedValue: scanner)
         self._selectedTab = selectedTab
@@ -26,7 +24,6 @@ struct ContentExplorerView: View {
         self._showingFolderPicker = showingFolderPicker
         self._showingNewFolderSheet = showingNewFolderSheet
         self._showingDeleteConfirmation = showingDeleteConfirmation
-        self.focusItem = focusItem
     }
     
     var body: some View {
@@ -155,9 +152,6 @@ struct ContentExplorerView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
-                .onTapGesture {
-                    focusItem(item.id)
-                }
             }
             
             TableColumn("Date", value: \.modificationDate) { item in

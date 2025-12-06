@@ -81,8 +81,7 @@ struct ContentView: View {
                 focusedItemID: $focusedItemID,
                 showingFolderPicker: $showingFolderPicker,
                 showingNewFolderSheet: $showingNewFolderSheet,
-                showingDeleteConfirmation: $showingDeleteConfirmation,
-                focusItem: focusItem(_:)
+                showingDeleteConfirmation: $showingDeleteConfirmation
             )
         }
         .frame(minWidth: 760, minHeight: 420)
@@ -104,7 +103,8 @@ struct ContentView: View {
         .onDisappear {
             removeSpaceKeyMonitor()
         }
-        .onChange(of: scanner.selectedItems) { _ in
+        .onChange(of: scanner.selectedItems) { newSelection in
+            updateFocusedItem(from: newSelection)
             refreshQuickLookSelection()
         }
         .onChange(of: focusedItemID) { _ in
@@ -159,6 +159,25 @@ struct ContentView: View {
         }
     }
     
+    private func updateFocusedItem(from selection: Set<UUID>) {
+        guard !selection.isEmpty else {
+            focusedItemID = nil
+            return
+        }
+        
+        let source: [DesktopItem]
+        switch selectedTab {
+        case .toClean:
+            source = scanner.items
+        case .ignored:
+            source = scanner.ignoredItems
+        }
+        
+        if let first = source.first(where: { selection.contains($0.id) }) {
+            focusItem(first.id)
+        }
+    }
+    
     private func previewSelectedItems() {
         let selectedURLs = currentSelectionURLs()
         
@@ -177,30 +196,28 @@ struct ContentView: View {
     // MARK: - Quick Look
     
     private func currentSelectionURLs() -> [URL] {
-        if let focusedId = focusedItemID,
-           let focusedItem = item(for: focusedId) {
-            return [focusedItem.url]
+        let source: [DesktopItem]
+        switch selectedTab {
+        case .toClean:
+            source = scanner.items
+        case .ignored:
+            source = scanner.ignoredItems
         }
         
-        if selectedTab == .toClean {
-            let selected = scanner.items.filter { scanner.selectedItems.contains($0.id) }
-            if !selected.isEmpty {
-                return selected.map { $0.url }
-            }
+        let selected = source.filter { scanner.selectedItems.contains($0.id) }
+        if !selected.isEmpty {
+            return selected.map { $0.url }
+        }
+        
+        if let focusedId = focusedItemID,
+           let focusedItem = source.first(where: { $0.id == focusedId }) {
+            return [focusedItem.url]
         }
         
         return []
     }
     
-    private func item(for id: UUID) -> DesktopItem? {
-        if let match = scanner.items.first(where: { $0.id == id }) {
-            return match
-        }
-        return scanner.ignoredItems.first(where: { $0.id == id })
-    }
-    
     private func focusItem(_ id: UUID) {
-        NSApp.keyWindow?.makeFirstResponder(nil)
         focusedItemID = id
     }
     
