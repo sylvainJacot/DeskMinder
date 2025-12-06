@@ -1,13 +1,14 @@
+import Foundation
 import SwiftUI
 
-enum FinderColumn: Hashable, CaseIterable {
+enum FinderColumn: String, Hashable, CaseIterable, Codable {
     case name
     case date
     case size
     case type
 }
 
-struct FinderColumnLayout: Equatable {
+struct FinderColumnLayout: Codable, Equatable {
     var nameWidth: CGFloat = 280
     var dateWidth: CGFloat = 170
     var sizeWidth: CGFloat = 110
@@ -38,6 +39,44 @@ struct FinderColumnLayout: Equatable {
     }
 }
 
+struct FinderColumnPreferences: Codable {
+    var layout: FinderColumnLayout
+    var order: [FinderColumn]
+    
+    private static let defaultsKey = "FinderColumnPreferences"
+    
+    static func load() -> FinderColumnPreferences {
+        let defaults = UserDefaults.standard
+        if let data = defaults.data(forKey: defaultsKey),
+           var prefs = try? JSONDecoder().decode(FinderColumnPreferences.self, from: data) {
+            prefs.order = sanitized(order: prefs.order)
+            return prefs
+        }
+        return FinderColumnPreferences(
+            layout: FinderColumnLayout(),
+            order: Array(FinderColumn.allCases)
+        )
+    }
+    
+    func save() {
+        let defaults = UserDefaults.standard
+        if let data = try? JSONEncoder().encode(self) {
+            defaults.set(data, forKey: Self.defaultsKey)
+        }
+    }
+    
+    private static func sanitized(order: [FinderColumn]) -> [FinderColumn] {
+        var unique: [FinderColumn] = []
+        for column in order where !unique.contains(column) {
+            unique.append(column)
+        }
+        for column in FinderColumn.allCases where !unique.contains(column) {
+            unique.append(column)
+        }
+        return unique
+    }
+}
+
 enum FinderLayoutConstants {
     static let trailingAccessoryWidth: CGFloat = 36
 }
@@ -46,9 +85,18 @@ private struct FinderColumnLayoutKey: EnvironmentKey {
     static let defaultValue = FinderColumnLayout()
 }
 
+private struct FinderColumnOrderKey: EnvironmentKey {
+    static let defaultValue = Array(FinderColumn.allCases)
+}
+
 extension EnvironmentValues {
-    var columnLayout: FinderColumnLayout {
+    var finderColumnLayout: FinderColumnLayout {
         get { self[FinderColumnLayoutKey.self] }
         set { self[FinderColumnLayoutKey.self] = newValue }
+    }
+    
+    var finderColumnOrder: [FinderColumn] {
+        get { self[FinderColumnOrderKey.self] }
+        set { self[FinderColumnOrderKey.self] = newValue }
     }
 }

@@ -11,7 +11,8 @@ struct DesktopItemRow: View {
     let onToggleIgnored: () -> Void
     
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.columnLayout) private var columnLayout
+    @Environment(\.finderColumnLayout) private var columnLayout
+    @Environment(\.finderColumnOrder) private var columnOrder
     @State private var isHovered = false
     
     private var formattedDate: String {
@@ -53,10 +54,11 @@ struct DesktopItemRow: View {
     
     var body: some View {
         HStack(spacing: 0) {
-            nameColumn
-            dateColumn
-            sizeColumn
-            typeColumn
+            ForEach(columnOrder, id: \.self) { column in
+                columnView(for: column)
+                    .frame(width: columnLayout.width(for: column), alignment: alignment(for: column))
+            }
+            
             ignoreToggle
                 .frame(width: FinderLayoutConstants.trailingAccessoryWidth, alignment: .center)
         }
@@ -103,38 +105,35 @@ struct DesktopItemRow: View {
     
     // MARK: - Columns
     
-    private var nameColumn: some View {
-        HStack(spacing: 8) {
-            selectionButton
-            FileThumbnailView(url: item.url)
-                .frame(width: 32, height: 32)
-            Text(item.name)
-                .font(.system(size: 14))
-                .foregroundStyle(titleColor)
+    @ViewBuilder
+    private func columnView(for column: FinderColumn) -> some View {
+        switch column {
+        case .name:
+            HStack(spacing: 8) {
+                selectionButton
+                FileThumbnailView(url: item.url)
+                    .frame(width: 32, height: 32)
+                Text(item.name)
+                    .font(.system(size: 14))
+                    .foregroundStyle(titleColor)
+                    .lineLimit(1)
+            }
+        case .date:
+            Text(formattedDate)
+                .font(.system(size: 13))
+                .foregroundStyle(metadataColor)
+                .lineLimit(1)
+        case .size:
+            Text(item.formattedFileSize)
+                .font(.system(size: 13, weight: .regular, design: .monospaced))
+                .foregroundStyle(metadataColor)
+                .lineLimit(1)
+        case .type:
+            Text(typeLabel)
+                .font(.system(size: 13))
+                .foregroundStyle(metadataColor)
                 .lineLimit(1)
         }
-        .frame(width: columnLayout.width(for: .name), alignment: .leading)
-    }
-    
-    private var dateColumn: some View {
-        Text(formattedDate)
-            .font(.system(size: 13))
-            .foregroundStyle(metadataColor)
-            .frame(width: columnLayout.width(for: .date), alignment: .leading)
-    }
-    
-    private var sizeColumn: some View {
-        Text(item.formattedFileSize)
-            .font(.system(size: 13, weight: .regular, design: .monospaced))
-            .foregroundStyle(metadataColor)
-            .frame(width: columnLayout.width(for: .size), alignment: .trailing)
-    }
-    
-    private var typeColumn: some View {
-        Text(typeLabel)
-            .font(.system(size: 13))
-            .foregroundStyle(metadataColor)
-            .frame(width: columnLayout.width(for: .type), alignment: .leading)
     }
     
     private var typeLabel: String {
@@ -143,6 +142,15 @@ struct DesktopItemRow: View {
             return "Fichier"
         }
         return ext.uppercased()
+    }
+    
+    private func alignment(for column: FinderColumn) -> Alignment {
+        switch column {
+        case .size:
+            return .trailing
+        default:
+            return .leading
+        }
     }
     
     // MARK: - Controls

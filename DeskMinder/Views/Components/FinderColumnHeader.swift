@@ -1,45 +1,35 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct FinderColumnHeader: View {
     @Binding var sortOption: DesktopScanner.SortOption
     @Binding var columnLayout: FinderColumnLayout
+    @Binding var columnOrder: [FinderColumn]
+    
+    @State private var draggingColumn: FinderColumn?
     
     var body: some View {
         HStack(spacing: 0) {
-            columnButton(
-                title: "Nom",
-                column: .name,
-                alignment: .leading,
-                ascending: .nameAsc,
-                descending: .nameDesc
-            )
-            resizeHandle(for: .name)
-            
-            columnButton(
-                title: "Date",
-                column: .date,
-                alignment: .leading,
-                ascending: .dateOldest,
-                descending: .dateNewest
-            )
-            resizeHandle(for: .date)
-            
-            columnButton(
-                title: "Taille",
-                column: .size,
-                alignment: .trailing,
-                ascending: .sizeAsc,
-                descending: .sizeDesc
-            )
-            resizeHandle(for: .size)
-            
-            columnButton(
-                title: "Type",
-                column: .type,
-                alignment: .leading,
-                ascending: .typeAsc,
-                descending: .typeDesc
-            )
+            ForEach(Array(columnOrder.enumerated()), id: \.element) { index, column in
+                columnButton(for: column)
+                    .frame(width: columnLayout.width(for: column), alignment: alignment(for: column))
+                    .onDrag {
+                        draggingColumn = column
+                        return NSItemProvider(object: column.rawValue as NSString)
+                    }
+                    .onDrop(
+                        of: [UTType.plainText],
+                        delegate: FinderColumnDropDelegate(
+                            targetColumn: column,
+                            columnOrder: $columnOrder,
+                            draggingColumn: $draggingColumn
+                        )
+                    )
+                
+                if index < columnOrder.count - 1 {
+                    FinderColumnResizeHandle(column: column, columnLayout: $columnLayout)
+                }
+            }
             
             Color.clear
                 .frame(width: FinderLayoutConstants.trailingAccessoryWidth)
@@ -59,51 +49,67 @@ struct FinderColumnHeader: View {
     
     // MARK: - Helpers
     
-    private func columnButton(
-        title: String,
-        column: FinderColumn,
-        alignment: Alignment,
-        ascending: DesktopScanner.SortOption,
-        descending: DesktopScanner.SortOption
-    ) -> some View {
-        Button {
-            toggleSort(ascending: ascending, descending: descending)
+    private func columnButton(for column: FinderColumn) -> some View {
+        let options = sortOptions(for: column)
+        return Button {
+            toggleSort(ascending: options.ascending, descending: options.descending)
         } label: {
             HStack(spacing: 4) {
-                Text(title)
-                if let indicator = sortIndicator(for: ascending, descending: descending) {
+                Text(title(for: column))
+                if let indicator = sortIndicator(for: column) {
                     indicator
                 }
             }
-            .frame(width: columnLayout.width(for: column), alignment: alignment)
+            .frame(maxWidth: .infinity, alignment: alignment(for: column))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
     
-    private func resizeHandle(for column: FinderColumn) -> some View {
-        FinderColumnResizeHandle(column: column, columnLayout: $columnLayout)
+    private func title(for column: FinderColumn) -> String {
+        switch column {
+        case .name: return "Nom"
+        case .date: return "Date"
+        case .size: return "Taille"
+        case .type: return "Type"
+        }
+    }
+    
+    private func alignment(for column: FinderColumn) -> Alignment {
+        switch column {
+        case .size:
+            return .trailing
+        default:
+            return .leading
+        }
+    }
+    
+    private func sortOptions(for column: FinderColumn) -> (ascending: DesktopScanner.SortOption, descending: DesktopScanner.SortOption) {
+        switch column {
+        case .name:
+            return (.nameAsc, .nameDesc)
+        case .date:
+            return (.dateOldest, .dateNewest)
+        case .size:
+            return (.sizeAsc, .sizeDesc)
+        case .type:
+            return (.typeAsc, .typeDesc)
+        }
     }
     
     private func toggleSort(
         ascending: DesktopScanner.SortOption,
         descending: DesktopScanner.SortOption
     ) {
-        if sortOption == ascending {
-            sortOption = descending
-        } else {
-            sortOption = ascending
-        }
+        sortOption = (sortOption == ascending) ? descending : ascending
     }
     
-    private func sortIndicator(
-        for ascending: DesktopScanner.SortOption,
-        descending: DesktopScanner.SortOption
-    ) -> Image? {
+    private func sortIndicator(for column: FinderColumn) -> Image? {
+        let options = sortOptions(for: column)
         switch sortOption {
-        case ascending:
+        case options.ascending:
             return Image(systemName: "chevron.up")
-        case descending:
+        case options.descending:
             return Image(systemName: "chevron.down")
         default:
             return nil
@@ -111,7 +117,7 @@ struct FinderColumnHeader: View {
     }
 }
 
-// MARK: - Resize Handle
+// MARK: - Resize Handle & Drop Delegate
 
 private struct FinderColumnResizeHandle: View {
     let column: FinderColumn
@@ -143,5 +149,38 @@ private struct FinderColumnResizeHandle: View {
                     .fill(Color.primary.opacity(0.12))
                     .frame(width: 1)
             )
+    }
+}
+
+private struct FinderColumnDropDelegate: DropDelegate {
+    let targetColumn: FinderColumn
+    @Binding var columnOrder: [FinderColumn]
+    @Binding var draggingColumn: FinderColumn?
+    
+    func dropEntered(info: DropInfo) {
+        guard let dragging = draggingColumn,
+              dragging != targetColumn else { return }
+        moveColumn(dragging, to: targetColumn)
+    }
+    
+    func performDrop(info: DropInfo) -> Bool {
+        draggingColumn = nil
+        return true
+    }
+    
+    func dropExited(info: DropInfo) {
+        draggingColumn = nil
+    }
+    
+    private func moveColumn(_ dragged: FinderColumn, to target: FinderColumn) {
+        guard let fromIndex = columnOrder.firstIndex(of: dragged) else { return }
+        var newOrder = columnOrder
+        newOrder.remove(at: fromIndex)
+        if let updatedTargetIndex = newOrder.firstIndex(of: target) {
+            newOrder.insert(dragged, at: updatedTargetIndex)
+        } else {
+            newOrder.append(dragged)
+        }
+        columnOrder = newOrder
     }
 }

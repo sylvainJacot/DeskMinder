@@ -11,6 +11,28 @@ struct ContentExplorerView: View {
     var focusItem: (UUID) -> Void
     
     @State private var columnLayout = FinderColumnLayout()
+    @State private var columnOrder: [FinderColumn] = Array(FinderColumn.allCases)
+    
+    init(
+        scanner: DesktopScanner,
+        selectedTab: Binding<ContentView.ListTab>,
+        focusedItemID: Binding<UUID?>,
+        showingFolderPicker: Binding<Bool>,
+        showingNewFolderSheet: Binding<Bool>,
+        showingDeleteConfirmation: Binding<Bool>,
+        focusItem: @escaping (UUID) -> Void
+    ) {
+        self._scanner = ObservedObject(wrappedValue: scanner)
+        self._selectedTab = selectedTab
+        self._focusedItemID = focusedItemID
+        self._showingFolderPicker = showingFolderPicker
+        self._showingNewFolderSheet = showingNewFolderSheet
+        self._showingDeleteConfirmation = showingDeleteConfirmation
+        self.focusItem = focusItem
+        let preferences = FinderColumnPreferences.load()
+        self._columnLayout = State(initialValue: preferences.layout)
+        self._columnOrder = State(initialValue: preferences.order)
+    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -48,7 +70,14 @@ struct ContentExplorerView: View {
             .padding(.horizontal)
             .padding(.vertical, 12)
         }
-        .environment(\.columnLayout, columnLayout)
+        .environment(\.finderColumnLayout, columnLayout)
+        .environment(\.finderColumnOrder, columnOrder)
+        .onChange(of: columnLayout) { _ in
+            saveColumnPreferences()
+        }
+        .onChange(of: columnOrder) { _ in
+            saveColumnPreferences()
+        }
     }
     
     // MARK: - Header & Toolbar
@@ -124,7 +153,8 @@ struct ContentExplorerView: View {
                 EmptyView()
             } else {
                 FinderColumnHeader(sortOption: $scanner.sortOption,
-                                   columnLayout: $columnLayout)
+                                   columnLayout: $columnLayout,
+                                   columnOrder: $columnOrder)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 6)
             }
@@ -192,6 +222,10 @@ struct ContentExplorerView: View {
             .foregroundColor(.secondary)
             .frame(maxWidth: .infinity, alignment: .center)
             .padding(.vertical, 24)
+    }
+    
+    private func saveColumnPreferences() {
+        FinderColumnPreferences(layout: columnLayout, order: columnOrder).save()
     }
 }
 
