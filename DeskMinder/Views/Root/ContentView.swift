@@ -272,29 +272,24 @@ struct ContentView: View {
 }
 
 #if DEBUG
-final class DesktopScannerPreviewMock: DesktopScanner {
-    private let previewScore: DeskCleanlinessScore
-    
-    init(score: DeskCleanlinessScore) {
-        self.previewScore = score
-        super.init()
-        self.cleanlinessScore = score
-    }
-    
-    override func refresh() {
-        cleanlinessScore = previewScore
-    }
+#Preview("Vue principale") {
+    ContentView(
+        scanner: .preview(
+            minDaysOld: 5,
+            sortOption: .dateNewest
+        )
+    )
+    .frame(width: 960, height: 520)
 }
 
-#Preview("Score élevé") {
-    ContentView(scanner: DesktopScannerPreviewMock(score: DeskCleanlinessScore(fileCount: 5, oldFileCount: 1, averageAge: 2)))
-}
-
-#Preview("Score moyen") {
-    ContentView(scanner: DesktopScannerPreviewMock(score: DeskCleanlinessScore(fileCount: 20, oldFileCount: 8, averageAge: 12)))
-}
-
-#Preview("Score faible") {
-    ContentView(scanner: DesktopScannerPreviewMock(score: DeskCleanlinessScore(fileCount: 45, oldFileCount: 25, averageAge: 45)))
+#Preview("Tri par taille") {
+    ContentView(
+        scanner: .preview(
+            itemsCount: 5,
+            minDaysOld: 3,
+            sortOption: .sizeDesc
+        )
+    )
+    .frame(width: 960, height: 520)
 }
 #endif

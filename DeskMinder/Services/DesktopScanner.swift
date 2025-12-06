@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import SwiftUI
 
 class DesktopScanner: ObservableObject {
     static let allowedDaysRange: ClosedRange<Int> = 1...2000
@@ -14,6 +15,11 @@ class DesktopScanner: ObservableObject {
     @Published private(set) var ignoredItemPaths: Set<String> = []
     @Published var selectedItems: Set<UUID> = []
     @Published var cleanlinessScore: DeskCleanlinessScore?
+    @Published var sortOrder: [KeyPathComparator<DesktopItem>] = DesktopScanner.defaultSortOrder {
+        didSet {
+            applySortOrder()
+        }
+    }
     let fileCountThreshold = 15
     private let ignoredDefaultsKey = "ignoredDesktopItemPaths"
     
@@ -50,7 +56,7 @@ class DesktopScanner: ObservableObject {
     
     @Published var sortOption: SortOption = .dateOldest {
         didSet {
-            applySorting()
+            sortOrder = sortOption.sortComparators
         }
     }
     
@@ -110,7 +116,7 @@ class DesktopScanner: ObservableObject {
                 self.items = filteredItems
                 self.ignoredItems = ignored
                 self.itemCount = filteredItems.count
-                self.applySorting()
+                self.applySortOrder()
                 self.updateCleanlinessScore(with: allItems)
                 self.handleNotificationIfNeeded()
             }
@@ -128,33 +134,9 @@ class DesktopScanner: ObservableObject {
         )
     }
     
-    private func applySorting() {
-        switch sortOption {
-        case .nameAsc:
-            items.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-        case .nameDesc:
-            items.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedDescending }
-        case .dateOldest:
-            items.sort { $0.lastModified < $1.lastModified }
-        case .dateNewest:
-            items.sort { $0.lastModified > $1.lastModified }
-        case .ageHighest:
-            items.sort { $0.daysOld > $1.daysOld }
-        case .ageLowest:
-            items.sort { $0.daysOld < $1.daysOld }
-        case .sizeAsc:
-            items.sort { $0.fileSize < $1.fileSize }
-        case .sizeDesc:
-            items.sort { $0.fileSize > $1.fileSize }
-        case .typeAsc:
-            items.sort {
-                $0.fileExtension.localizedCaseInsensitiveCompare($1.fileExtension) == .orderedAscending
-            }
-        case .typeDesc:
-            items.sort {
-                $0.fileExtension.localizedCaseInsensitiveCompare($1.fileExtension) == .orderedDescending
-            }
-        }
+    func applySortOrder() {
+        items.sort(using: sortOrder)
+        ignoredItems.sort(using: sortOrder)
     }
     
     private func updateCleanlinessScore(with desktopItems: [DesktopItem]) {
@@ -360,3 +342,127 @@ class DesktopScanner: ObservableObject {
         return createFolderAndMove(folderName: "DeskMinder - Tri", in: documents)
     }
 }
+
+private extension DesktopScanner {
+    static let defaultSortOrder: [KeyPathComparator<DesktopItem>] = SortOption.dateOldest.sortComparators
+}
+
+private extension DesktopScanner.SortOption {
+    var sortComparators: [KeyPathComparator<DesktopItem>] {
+        switch self {
+        case .nameAsc:
+            return [.init(\DesktopItem.displayName, order: .forward)]
+        case .nameDesc:
+            return [.init(\DesktopItem.displayName, order: .reverse)]
+        case .dateOldest:
+            return [.init(\DesktopItem.modificationDate, order: .forward)]
+        case .dateNewest:
+            return [.init(\DesktopItem.modificationDate, order: .reverse)]
+        case .ageHighest:
+            return [.init(\DesktopItem.daysOld, order: .reverse)]
+        case .ageLowest:
+            return [.init(\DesktopItem.daysOld, order: .forward)]
+        case .sizeAsc:
+            return [.init(\DesktopItem.fileSize, order: .forward)]
+        case .sizeDesc:
+            return [.init(\DesktopItem.fileSize, order: .reverse)]
+        case .typeAsc:
+            return [.init(\DesktopItem.fileExtension, order: .forward)]
+        case .typeDesc:
+            return [.init(\DesktopItem.fileExtension, order: .reverse)]
+        }
+    }
+}
+
+#if DEBUG
+extension DesktopScanner {
+    static func preview(
+        itemsCount: Int? = nil,
+        minDaysOld: Int = 7,
+        sortOption: SortOption = .dateOldest,
+        ignoredPaths: Set<String>? = nil
+    ) -> DesktopScanner {
+        let availableItems = DesktopItem.previewItems
+        guard !availableItems.isEmpty else {
+            return DesktopScannerPreview(
+                items: [],
+                ignoredPaths: [],
+                minDaysOld: minDaysOld,
+                sortOption: sortOption
+            )
+        }
+        
+        let targetCount = itemsCount ?? availableItems.count
+        let clampedCount = min(max(targetCount, 1), availableItems.count)
+        let selectedItems = Array(availableItems.prefix(clampedCount))
+        let baseIgnoredPaths = ignoredPaths ?? DesktopItem.previewIgnoredPaths
+        let filteredIgnoredPaths = Set(
+            baseIgnoredPaths.filter { path in
+                selectedItems.contains { $0.url.path == path }
+            }
+        )
+        
+        return DesktopScannerPreview(
+            items: selectedItems,
+            ignoredPaths: filteredIgnoredPaths,
+            minDaysOld: minDaysOld,
+            sortOption: sortOption
+        )
+    }
+    
+    fileprivate func setPreviewItemCount(_ count: Int) {
+        self.itemCount = count
+    }
+    
+    fileprivate func setPreviewIgnoredPaths(_ paths: Set<String>) {
+        self.ignoredItemPaths = paths
+    }
+}
+
+private final class DesktopScannerPreview: DesktopScanner {
+    private let previewItemsData: [DesktopItem]
+    
+    init(
+        items: [DesktopItem],
+        ignoredPaths: Set<String>,
+        minDaysOld: Int,
+        sortOption: SortOption
+    ) {
+        self.previewItemsData = items
+        super.init()
+        setPreviewIgnoredPaths(ignoredPaths)
+        self.sortOption = sortOption
+        self.minDaysOld = minDaysOld
+    }
+    
+    override func refresh() {
+        applyPreviewData()
+    }
+    
+    private func applyPreviewData() {
+        let filteredItems = previewItemsData.filter {
+            $0.daysOld >= minDaysOld && !ignoredItemPaths.contains($0.url.path)
+        }
+        let ignoredItems = previewItemsData.filter {
+            ignoredItemPaths.contains($0.url.path)
+        }
+        
+        self.items = filteredItems
+        self.ignoredItems = ignoredItems
+        setPreviewItemCount(filteredItems.count)
+        self.cleanlinessScore = DeskCleanlinessScore(
+            fileCount: previewItemsData.count,
+            oldFileCount: previewItemsData.filter { $0.daysOld >= minDaysOld }.count,
+            averageAge: DesktopScannerPreview.averageAge(for: previewItemsData)
+        )
+        selectedItems.removeAll()
+        applySortOrder()
+    }
+    
+    private static func averageAge(for items: [DesktopItem]) -> Double {
+        guard !items.isEmpty else { return 0 }
+        let totalDays = items.reduce(0.0) { $0 + Double($1.daysOld) }
+        return totalDays / Double(items.count)
+    }
+}
+#endif
