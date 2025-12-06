@@ -68,13 +68,14 @@ struct ContentView: View {
     private let quickLookCoordinator = QuickLookPreviewCoordinator()
     
     var body: some View {
-        HSplitView {
+        NavigationSplitView {
             MainSidebarView(
                 scanner: scanner,
                 thresholdValue: $thresholdValue,
                 thresholdUnit: $thresholdUnit,
                 autoCleanEnabled: $autoCleanEnabled
             )
+        } detail: {
             ContentExplorerView(
                 scanner: scanner,
                 selectedTab: $selectedTab,
@@ -83,6 +84,10 @@ struct ContentView: View {
                 showingNewFolderSheet: $showingNewFolderSheet,
                 showingDeleteConfirmation: $showingDeleteConfirmation
             )
+        }
+        .navigationSplitViewColumnWidth(min: 260, ideal: 320, max: 420)
+        .transaction { transaction in
+            transaction.animation = nil
         }
         .frame(minWidth: 760, minHeight: 420)
         .alert("Confirmer la suppression", isPresented: $showingDeleteConfirmation) {

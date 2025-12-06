@@ -30,7 +30,7 @@ struct ContentExplorerView: View {
         VStack(spacing: 0) {
             tabPicker
                 .padding(.horizontal)
-                .padding(.bottom, 12)
+                .padding(.vertical, 12)
             
             Divider()
             
@@ -41,7 +41,8 @@ struct ContentExplorerView: View {
             
             ZStack {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(.ultraThinMaterial)
+                    .fill(Color(nsColor: .windowBackgroundColor))
+                    .shadow(color: Color.black.opacity(0.08), radius: 1, y: 1)
                 
                 currentContent
                     .padding(12)
@@ -63,19 +64,7 @@ struct ContentExplorerView: View {
     }
     
     private var selectionToolbar: some View {
-        HStack(spacing: 12) {
-            Button {
-                if scanner.isAllSelected {
-                    scanner.deselectAll()
-                } else {
-                    scanner.selectAll()
-                }
-            } label: {
-                Image(systemName: scanner.isAllSelected ? "checkmark.square.fill" : "square")
-                    .foregroundColor(scanner.isAllSelected ? .accentColor : .secondary)
-            }
-            .buttonStyle(.borderless)
-            .help(scanner.isAllSelected ? "Tout désélectionner" : "Tout sélectionner")
+        HStack() {
             
             if scanner.selectedCount > 0 {
                 Text("\(scanner.selectedCount) sélectionné(s)")
@@ -155,7 +144,7 @@ struct ContentExplorerView: View {
             }
             
             TableColumn("Date", value: \.modificationDate) { item in
-                Text(item.formattedModificationDate)
+                Text(item.formattedLastModified)
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -176,7 +165,7 @@ struct ContentExplorerView: View {
                     .lineLimit(1)
             }
         }
-        .tableStyle(.bordered(alternatesRowBackgrounds: true))
+        .tableStyle(.inset(alternatesRowBackgrounds: true))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .contextMenu(forSelectionType: DesktopItem.ID.self) { selection in
             rowContextMenu(forSelection: selection, isIgnoredList: isIgnoredList)

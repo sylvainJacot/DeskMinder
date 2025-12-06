@@ -13,7 +13,17 @@ class DesktopScanner: ObservableObject {
     @Published var ignoredItems: [DesktopItem] = []
     @Published private(set) var itemCount: Int = 0
     @Published private(set) var ignoredItemPaths: Set<String> = []
-    @Published var selectedItems: Set<UUID> = []
+    @Published var selectedItems: Set<UUID> = [] {
+        didSet {
+            selectedItemsCount = selectedItems.count
+        }
+    }
+    @Published private(set) var totalItemsCount: Int = 0
+    @Published private(set) var selectedItemsCount: Int = 0
+    @Published private(set) var ignoredItemsCount: Int = 0
+    @Published private(set) var totalItemsSize: Int64 = 0
+    @Published private(set) var formattedTotalSize: String = ByteCountFormatter.string(fromByteCount: 0, countStyle: .file)
+    @Published private(set) var oldestItemAgeDescription: String?
     @Published var cleanlinessScore: DeskCleanlinessScore?
     @Published var sortOrder: [KeyPathComparator<DesktopItem>] = DesktopScanner.defaultSortOrder {
         didSet {
@@ -117,6 +127,7 @@ class DesktopScanner: ObservableObject {
                 self.ignoredItems = ignored
                 self.itemCount = filteredItems.count
                 self.applySortOrder()
+                self.updateCachedStats()
                 self.updateCleanlinessScore(with: allItems)
                 self.handleNotificationIfNeeded()
             }
@@ -186,41 +197,7 @@ class DesktopScanner: ObservableObject {
     }
     
     var selectedCount: Int {
-        selectedItems.count
-    }
-    
-    var totalItemsCount: Int {
-        items.count
-    }
-    
-    var selectedItemsCount: Int {
-        selectedItems.count
-    }
-    
-    var ignoredItemsCount: Int {
-        ignoredItems.count
-    }
-    
-    private var totalSizeBytes: Int64 {
-        items.reduce(Int64(0)) { partial, item in
-            partial + Int64(item.fileSize)
-        }
-    }
-    
-    var formattedTotalSize: String {
-        ByteCountFormatter.string(fromByteCount: totalSizeBytes, countStyle: .file)
-    }
-    
-    var oldestItemAgeDescription: String? {
-        guard let maxDays = items.map(\.daysOld).max() else { return nil }
-        switch maxDays {
-        case 0:
-            return "Aujourd'hui"
-        case 1:
-            return "1 jour"
-        default:
-            return "\(maxDays) jours"
-        }
+        selectedItemsCount
     }
     
     var currentScore: DeskCleanlinessScore? {
@@ -344,6 +321,33 @@ class DesktopScanner: ObservableObject {
 }
 
 private extension DesktopScanner {
+    func updateCachedStats() {
+        totalItemsCount = items.count
+        ignoredItemsCount = ignoredItems.count
+        totalItemsSize = items.reduce(Int64(0)) { partial, item in
+            partial + Int64(item.fileSize)
+        }
+        formattedTotalSize = ByteCountFormatter.string(
+            fromByteCount: totalItemsSize,
+            countStyle: .file
+        )
+        oldestItemAgeDescription = Self.makeOldestItemDescription(from: items)
+    }
+    
+    static func makeOldestItemDescription(from items: [DesktopItem]) -> String? {
+        guard let maxDays = items.map(\.daysOld).max() else { return nil }
+        switch maxDays {
+        case 0:
+            return "Aujourd'hui"
+        case 1:
+            return "1 jour"
+        default:
+            return "\(maxDays) jours"
+        }
+    }
+}
+
+private extension DesktopScanner {
     static let defaultSortOrder: [KeyPathComparator<DesktopItem>] = SortOption.dateOldest.sortComparators
 }
 
@@ -456,6 +460,7 @@ private final class DesktopScannerPreview: DesktopScanner {
             averageAge: DesktopScannerPreview.averageAge(for: previewItemsData)
         )
         selectedItems.removeAll()
+        updateCachedStats()
         applySortOrder()
     }
     

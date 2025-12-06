@@ -29,6 +29,10 @@ struct DesktopItem: Identifiable {
         DesktopItem.dateFormatter.string(from: modificationDate)
     }
     
+    var formattedLastModified: String {
+        DesktopItem.dateFormatter.string(from: lastModified)
+    }
+    
     var fileExtension: String {
         let ext = url.pathExtension.uppercased()
         return ext.isEmpty ? "—" : ext

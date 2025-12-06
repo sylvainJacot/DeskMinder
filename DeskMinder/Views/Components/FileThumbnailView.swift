@@ -30,18 +30,31 @@ struct FileThumbnailView: View {
     }
     
     private func loadDefaultIcon() {
+        let ext = url.pathExtension.lowercased()
+        if let cached = ThumbnailCache.shared.icon(forFileExtension: ext) {
+            defaultIcon = cached
+            return
+        }
+        
         let icon = NSWorkspace.shared.icon(forFile: url.path)
         icon.size = NSSize(width: size, height: size)
         defaultIcon = icon
+        ThumbnailCache.shared.setIcon(icon, forFileExtension: ext)
     }
     
     private func generateThumbnailIfNeeded() {
+        if let cached = ThumbnailCache.shared.thumbnail(for: url) {
+            thumbnail = cached
+            return
+        }
+        
         guard thumbnail == nil, !isGenerating else { return }
         isGenerating = true
+        let currentURL = url
         
         let scale = NSScreen.main?.backingScaleFactor ?? 2
         let request = QLThumbnailGenerator.Request(
-            fileAt: url,
+            fileAt: currentURL,
             size: CGSize(width: size, height: size),
             scale: scale,
             representationTypes: .all
@@ -50,8 +63,10 @@ struct FileThumbnailView: View {
         QLThumbnailGenerator.shared.generateBestRepresentation(for: request) { representation, _ in
             DispatchQueue.main.async {
                 self.isGenerating = false
+                guard currentURL == self.url else { return }
                 if let image = representation?.nsImage {
                     self.thumbnail = image
+                    ThumbnailCache.shared.setThumbnail(image, for: currentURL)
                 }
             }
         }

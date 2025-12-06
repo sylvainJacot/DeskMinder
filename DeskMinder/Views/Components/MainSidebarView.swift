@@ -21,14 +21,14 @@ struct MainSidebarView: View {
                 Divider()
                 
                 filtersSection
-                Divider()
+                // Divider()
                 
-                automationSection
+                // automationSection
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
         }
-        .frame(minWidth: 280, idealWidth: 320, maxWidth: 360)
+        .frame(minWidth: 260)
         .background(
             Color(nsColor: .windowBackgroundColor)
                 .opacity(0.98)
@@ -120,7 +120,15 @@ struct MainSidebarView: View {
                         .foregroundColor(.secondary)
                 }
                 
-                Slider(value: $thresholdValue, in: sliderRange, step: 1)
+                TextField("Valeur", text: Binding(
+    get: { String(Int(thresholdValue)) },
+    set: { newValue in
+        if let v = Int(newValue) {
+            thresholdValue = Double(v)
+        }
+    }
+))
+.textFieldStyle(.roundedBorder)
                 
                 Picker("Unité", selection: $thresholdUnit) {
                     ForEach(ContentView.ThresholdUnit.allCases) { unit in
@@ -136,21 +144,21 @@ struct MainSidebarView: View {
         }
     }
     
-    private var automationSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            sectionTitle("Automatisation")
+    // private var automationSection: some View {
+    //     VStack(alignment: .leading, spacing: 10) {
+    //         sectionTitle("Automatisation")
             
-            Toggle(isOn: $autoCleanEnabled) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Activer le nettoyage automatique")
-                    Text("Prépare l'activation de règles automatiques (fonctionnalité à venir).")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
-            .toggleStyle(.switch)
-        }
-    }
+    //         Toggle(isOn: $autoCleanEnabled) {
+    //             VStack(alignment: .leading, spacing: 2) {
+    //                 Text("Activer le nettoyage automatique")
+    //                 Text("Prépare l'activation de règles automatiques (fonctionnalité à venir).")
+    //                     .font(.caption)
+    //                     .foregroundColor(.secondary)
+    //             }
+    //         }
+    //         .toggleStyle(.switch)
+    //     }
+    // }
     
     // MARK: - Helpers
     
