@@ -44,18 +44,27 @@ struct MainSidebarView: View {
                 .fontWeight(.semibold)
             
             if let score = scanner.currentScore {
-                HStack(alignment: .center, spacing: 12) {
-                    Text(score.percentageFormatted)
-                        .font(.system(size: 34, weight: .bold, design: .rounded))
-                        .foregroundColor(scoreAccentColor(for: score.score))
-                    
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(score.qualitativeLabel)
-                            .font(.headline)
-                        Text(score.localizedDescription)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .center, spacing: 12) {
+                        Text(score.percentageFormatted)
+                            .font(.system(size: 34, weight: .bold, design: .rounded))
+                            .foregroundColor(scoreAccentColor(for: score))
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(score.qualitativeLabel)
+                                .font(.headline)
+                            Text(score.localizedDescription)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
                     }
+                    
+                    HStack(spacing: 12) {
+                        scoreMetric(label: "Fichiers", value: "\(score.fileCount)")
+                        scoreMetric(label: "Vieux fichiers", value: "\(score.oldFileCount)")
+                        scoreMetric(label: "Âge moyen", value: "\(score.formattedAverageAge) j")
+                    }
+                    .font(.caption)
                 }
             } else {
                 Text("Aucun scan récent")
@@ -186,14 +195,25 @@ struct MainSidebarView: View {
         .font(.subheadline)
     }
     
-    private func scoreAccentColor(for score: Int) -> Color {
-        switch score {
-        case 80...100:
+    private func scoreAccentColor(for score: DeskCleanlinessScore) -> Color {
+        switch score.level {
+        case .good:
             return .green
-        case 50..<80:
+        case .medium:
             return .orange
-        default:
+        case .bad:
             return .red
+        }
+    }
+    
+    private func scoreMetric(label: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(.caption2)
+                .foregroundColor(.secondary)
+            Text(value)
+                .font(.caption)
+                .fontWeight(.semibold)
         }
     }
 }

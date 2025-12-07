@@ -9,8 +9,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // On partage un scanner unique pour toute l’app
     let scanner = DesktopScanner()
     private var cancellables = Set<AnyCancellable>()
-    private var badgeColor: NSColor = .systemBlue
-    private var currentItemCount: Int = 0
     
     deinit {
         NotificationCenter.default.removeObserver(self)
@@ -36,19 +34,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         )
         NotificationManager.shared.requestAuthorization() // Appelé au lancement; lancer l’app via Xcode et dépasser le seuil pour tester les notifications.
         
-        updateStatusItemCount(scanner.itemCount)
-        
-        scanner.$itemCount
-            .receive(on: RunLoop.main)
-            .sink { [weak self] count in
-                self?.updateStatusItemCount(count)
-            }
-            .store(in: &cancellables)
+        updateStatusItem(for: scanner.cleanlinessScore)
         
         scanner.$cleanlinessScore
             .receive(on: RunLoop.main)
             .sink { [weak self] score in
-                self?.updateBadgeColor(from: score)
+                self?.updateStatusItem(for: score)
             }
             .store(in: &cancellables)
         
@@ -79,97 +70,135 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         showPopover()
     }
     
-    private func updateStatusItemCount(_ count: Int) {
+    private func updateStatusItem(for score: DeskCleanlinessScore?) {
         guard let button = statusItem.button else { return }
-        currentItemCount = count
-        button.image = makeStatusImage(count: count, badgeColor: badgeColor)
-        button.image?.isTemplate = false
+        
+        guard let score = score else {
+            button.image = NSImage(systemSymbolName: "tray", accessibilityDescription: "DeskMinder")
+            button.image?.isTemplate = true
+            return
+        }
+        
+        let baseSymbolName = score.fileCount > 0 ? "tray.full" : "tray"
+        let overlay: NSImage?
+        switch score.level {
+        case .good:
+            overlay = makeCheckBadgeImage()
+        case .medium:
+            overlay = makeBadgeStatusImage(count: score.fileCount, color: .systemOrange)
+        case .bad:
+            overlay = makeBadgeStatusImage(count: score.fileCount, color: .systemRed)
+        }
+        
+        if let image = makeStatusCompositeImage(baseSymbolName: baseSymbolName, overlay: overlay) {
+            button.image = image
+            button.image?.isTemplate = false
+        } else {
+            button.image = NSImage(systemSymbolName: baseSymbolName, accessibilityDescription: "DeskMinder")
+            button.image?.isTemplate = true
+        }
     }
     
-    private func makeStatusImage(count: Int, badgeColor: NSColor) -> NSImage? {
-        let symbolName = count > 0 ? "tray.full" : "tray"
-        guard let baseSymbol = NSImage(systemSymbolName: symbolName, accessibilityDescription: "DeskMinder") else {
+    private func makeStatusCompositeImage(baseSymbolName: String, overlay: NSImage?, spacing: CGFloat = 6) -> NSImage? {
+        guard let baseSymbol = NSImage(systemSymbolName: baseSymbolName, accessibilityDescription: "DeskMinder") else {
             return nil
         }
-        
         let configuration = NSImage.SymbolConfiguration(pointSize: 16, weight: .regular)
-        guard let configuredSymbol = baseSymbol.withSymbolConfiguration(configuration) else {
-            return nil
-        }
-        let baseImage = configuredSymbol.tinted(with: .white)
+        let configuredBase = baseSymbol.withSymbolConfiguration(configuration)?.tinted(with: .white) ?? baseSymbol
+        let baseSize = NSSize(width: 18, height: 18)
+        configuredBase.size = baseSize
         
-        let traySize = NSSize(width: 18, height: 18)
-        baseImage.size = traySize
-        
-        let baseBadgeHeight: CGFloat = 22
-        let spacing: CGFloat = count > 0 ? 8 : 0
-        
-        let badgeText: String
-        if count > 999 {
-            badgeText = "999+"
-        } else {
-            badgeText = "\(count)"
-        }
-        
-        let fontSize: CGFloat = badgeText.count >= 3 ? 10 : 12
-        let font = NSFont.monospacedDigitSystemFont(ofSize: fontSize, weight: .semibold)
-        let paragraph = NSMutableParagraphStyle()
-        paragraph.alignment = .center
-        
-        let attributes: [NSAttributedString.Key: Any] = [
-            .foregroundColor: NSColor.white,
-            .font: font,
-            .paragraphStyle: paragraph
-        ]
-        
-        let textSize = badgeText.size(withAttributes: attributes)
-        let horizontalPadding: CGFloat = 6
-        let badgeWidth = max(baseBadgeHeight, textSize.width + horizontalPadding)
-        let width = traySize.width + spacing + (count > 0 ? badgeWidth : 0)
-        let height = max(traySize.height, baseBadgeHeight)
-        
+        let overlaySize = overlay?.size ?? .zero
+        let width = baseSize.width + (overlay != nil ? spacing + overlaySize.width : 0)
+        let height = max(baseSize.height, overlaySize.height)
         let image = NSImage(size: NSSize(width: width, height: height))
         image.lockFocus()
         
-        let trayRect = NSRect(x: 0, y: (height - traySize.height) / 2, width: traySize.width, height: traySize.height)
-        baseImage.draw(in: trayRect)
+        let baseRect = NSRect(
+            x: 0,
+            y: (height - baseSize.height) / 2,
+            width: baseSize.width,
+            height: baseSize.height
+        )
+        configuredBase.draw(in: baseRect)
         
-        if count > 0 {
-            let badgeRect = NSRect(x: trayRect.maxX + spacing, y: (height - baseBadgeHeight) / 2, width: badgeWidth, height: baseBadgeHeight)
-            let circlePath = NSBezierPath(ovalIn: badgeRect)
-            badgeColor.setFill()
-            circlePath.fill()
-            
-            let textRect = badgeRect.insetBy(dx: 3, dy: 4)
-            badgeText.draw(in: textRect, withAttributes: attributes)
+        if let overlay = overlay {
+            let overlayRect = NSRect(
+                x: baseRect.maxX + spacing,
+                y: (height - overlaySize.height) / 2,
+                width: overlaySize.width,
+                height: overlaySize.height
+            )
+            overlay.draw(in: overlayRect)
         }
         
         image.unlockFocus()
+        image.isTemplate = false
         return image
     }
     
-    private func updateBadgeColor(from score: DeskCleanlinessScore?) {
-        let newColor = color(for: score)
+    private func makeCheckBadgeImage() -> NSImage? {
+        guard let baseSymbol = NSImage(systemSymbolName: "checkmark", accessibilityDescription: "Bureau propre") else {
+            return nil
+        }
         
-        if badgeColor.isEqual(newColor) { return }
+        let configuration = NSImage.SymbolConfiguration(pointSize: 11, weight: .semibold)
+        guard let configuredSymbol = baseSymbol.withSymbolConfiguration(configuration)?.tinted(with: .white) else {
+            return nil
+        }
         
-        badgeColor = newColor
-        updateStatusItemCount(currentItemCount)
+        let size = NSSize(width: 18, height: 18)
+        let image = NSImage(size: size)
+        image.lockFocus()
+        
+        let rect = NSRect(origin: .zero, size: size)
+        let path = NSBezierPath(roundedRect: rect, xRadius: size.height / 2, yRadius: size.height / 2)
+        NSColor.systemGreen.setFill()
+        path.fill()
+        
+        let symbolRect = rect.insetBy(dx: 4, dy: 4)
+        configuredSymbol.draw(in: symbolRect)
+        
+        image.unlockFocus()
+        image.isTemplate = false
+        return image
     }
     
-    private func color(for score: DeskCleanlinessScore?) -> NSColor {
-        guard let value = score?.score else {
-            return .systemBlue
-        }
+    private func makeBadgeStatusImage(count: Int, color: NSColor) -> NSImage? {
+        let clampedCount = max(0, count)
+        let text = clampedCount > 999 ? "999+" : "\(clampedCount)"
+        let font = NSFont.systemFont(ofSize: 11, weight: .medium)
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: font
+        ]
+        let textSize = (text as NSString).size(withAttributes: attributes)
+        let padding: CGFloat = 6
+        let size = NSSize(width: max(18, textSize.width + padding * 2), height: 18)
         
-        switch value {
-        case 80...100:
-            return .systemGreen
-        case 50..<80:
-            return .systemOrange
-        default:
-            return .systemRed
-        }
+        let image = NSImage(size: size)
+        image.lockFocus()
+        
+        let rect = NSRect(origin: .zero, size: size)
+        let path = NSBezierPath(roundedRect: rect, xRadius: size.height / 2, yRadius: size.height / 2)
+        color.setFill()
+        path.fill()
+        
+        let textRect = NSRect(
+            x: (size.width - textSize.width) / 2,
+            y: (size.height - textSize.height) / 2,
+            width: textSize.width,
+            height: textSize.height
+        )
+        
+        let textAttributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: NSColor.white
+        ]
+        (text as NSString).draw(in: textRect, withAttributes: textAttributes)
+        
+        image.unlockFocus()
+        image.isTemplate = false
+        return image
     }
 }
 

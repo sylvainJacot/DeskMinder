@@ -1,18 +1,25 @@
 import Foundation
 
 struct DesktopItem: Identifiable {
-    let id = UUID()
+    let id: UUID
     let url: URL
-    let name: String
     let lastModified: Date
-    let fileSize: Int
+    let fileSize: Int64
     
-    var displayName: String {
-        name
+    init(
+        id: UUID = UUID(),
+        url: URL,
+        lastModified: Date,
+        fileSize: Int64
+    ) {
+        self.id = id
+        self.url = url
+        self.lastModified = lastModified
+        self.fileSize = fileSize
     }
     
-    var modificationDate: Date {
-        lastModified
+    var displayName: String {
+        url.lastPathComponent
     }
     
     var daysOld: Int {
@@ -21,26 +28,21 @@ struct DesktopItem: Identifiable {
         return components.day ?? 0
     }
     
-    var formattedFileSize: String {
-        DesktopItem.sizeFormatter.string(fromByteCount: Int64(fileSize))
-    }
-    
-    var formattedModificationDate: String {
-        DesktopItem.dateFormatter.string(from: modificationDate)
-    }
-    
     var formattedLastModified: String {
         DesktopItem.dateFormatter.string(from: lastModified)
     }
     
     var fileExtension: String {
-        let ext = url.pathExtension.uppercased()
-        return ext.isEmpty ? "—" : ext
+        let ext = url.pathExtension.lowercased()
+        return ext.isEmpty ? "—" : ext.uppercased()
     }
     
-    private static let sizeFormatter: ByteCountFormatter = {
+    var formattedFileSize: String {
+        DesktopItem.byteFormatter.string(fromByteCount: fileSize)
+    }
+    
+    private static let byteFormatter: ByteCountFormatter = {
         let formatter = ByteCountFormatter()
-        formatter.allowedUnits = [.useKB, .useMB, .useGB]
         formatter.countStyle = .file
         return formatter
     }()
@@ -121,9 +123,8 @@ extension DesktopItem {
         let lastModified = Calendar.current.date(byAdding: .day, value: -daysOld, to: Date()) ?? Date()
         return DesktopItem(
             url: fileURL,
-            name: name,
             lastModified: lastModified,
-            fileSize: sizeInKB * 1_024
+            fileSize: Int64(sizeInKB) * 1_024
         )
     }
     

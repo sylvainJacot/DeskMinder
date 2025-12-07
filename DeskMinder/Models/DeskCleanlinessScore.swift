@@ -1,35 +1,63 @@
 import Foundation
 
-/// Représente l'indice de propreté calculé à partir du bureau.
-/// Pour ajuster l'impact de chaque critère, il suffit de modifier les pondérations
-/// appliquées dans l'initialiseur (sections surcharge, anciens fichiers, âge moyen).
 struct DeskCleanlinessScore: Equatable {
     let fileCount: Int
     let oldFileCount: Int
     let averageAge: Double
     let score: Int
     
-    init(fileCount: Int, oldFileCount: Int, averageAge: Double) {
+    enum Level {
+        case good
+        case medium
+        case bad
+    }
+    
+    init(fileCount: Int, oldFileCount: Int, averageAge: Double, score: Int) {
         self.fileCount = fileCount
         self.oldFileCount = oldFileCount
         self.averageAge = averageAge
-        
-        var computedScore = 100
-        let hasOldFiles = oldFileCount > 0
-        
-        if hasOldFiles {
-            computedScore -= min(fileCount * 2, 30)            // surcharge : max -30
-            computedScore -= min(Int(averageAge * 1.2), 30)    // âge moyen élevé : max -30
+        self.score = max(0, min(score, 100))
+    }
+    
+    init(fileCount: Int, oldFileCount: Int, averageAge: Double) {
+        self.init(
+            fileCount: fileCount,
+            oldFileCount: oldFileCount,
+            averageAge: averageAge,
+            score: DeskCleanlinessScore.computeScore(
+                fileCount: fileCount,
+                oldFileCount: oldFileCount,
+                averageAge: averageAge
+            )
+        )
+    }
+    
+    var level: Level {
+        if score >= 80,
+           oldFileCount <= 5,
+           averageAge <= 14 {
+            return .good
         }
         
-        computedScore -= min(oldFileCount * 3, 40)             // fichiers anciens : max -40
-        computedScore = max(0, computedScore)
-        self.score = computedScore
+        let oldFileRatio = fileCount > 0 ? Double(oldFileCount) / Double(fileCount) : 0
+        
+        if score < 30
+            || oldFileRatio >= 0.85
+            || averageAge >= 90 {
+            return .bad
+        }
+        
+        return .medium
     }
     
     /// Fournit une valeur réaliste pour les aperçus SwiftUI.
     static func mock() -> DeskCleanlinessScore {
-        DeskCleanlinessScore(fileCount: 24, oldFileCount: 12, averageAge: 18.5)
+        DeskCleanlinessScore(
+            fileCount: 24,
+            oldFileCount: 12,
+            averageAge: 18.5,
+            score: DeskCleanlinessScore.computeScore(fileCount: 24, oldFileCount: 12, averageAge: 18.5)
+        )
     }
 }
 
@@ -50,24 +78,37 @@ extension DeskCleanlinessScore {
     }
     
     var qualitativeLabel: String {
-        switch score {
-        case 80...100:
-            return "Propre"
-        case 50..<80:
-            return "À ranger"
-        default:
-            return "Très encombré"
+        switch level {
+        case .good:
+            return "Bureau propre"
+        case .medium:
+            return "Bureau à surveiller"
+        case .bad:
+            return "Bureau encombré"
         }
     }
     
     var localizedDescription: String {
-        switch score {
-        case 80...100:
-            return "Votre bureau est sous contrôle. Continuez ainsi !"
-        case 50..<80:
-            return "Quelques fichiers méritent un coup d'œil."
-        default:
-            return "Un tri s'impose pour retrouver de l'espace."
+        switch level {
+        case .good:
+            return "Ton bureau est globalement clean, rien d’urgent."
+        case .medium:
+            return "Ton bureau commence à se charger, tu peux envisager un petit tri."
+        case .bad:
+            return "Ton bureau est très encombré et contient de vieux fichiers, il est temps de ranger."
         }
+    }
+    
+    static func computeScore(fileCount: Int, oldFileCount: Int, averageAge: Double) -> Int {
+        var computedScore = 100
+        let hasOldFiles = oldFileCount > 0
+        
+        if hasOldFiles {
+            computedScore -= min(fileCount * 2, 30)            // surcharge : max -30
+            computedScore -= min(Int(averageAge * 1.2), 30)    // âge moyen élevé : max -30
+        }
+        
+        computedScore -= min(oldFileCount * 3, 40)             // fichiers anciens : max -40
+        return max(0, min(computedScore, 100))
     }
 }

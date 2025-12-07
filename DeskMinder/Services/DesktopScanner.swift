@@ -108,9 +108,8 @@ class DesktopScanner: ObservableObject {
                 
                 let item = DesktopItem(
                     url: url,
-                    name: url.lastPathComponent,
                     lastModified: lastModified,
-                    fileSize: resourceValues.fileSize ?? 0
+                    fileSize: Int64(resourceValues.fileSize ?? 0)
                 )
                 
                 allItems.append(item)
@@ -151,18 +150,26 @@ class DesktopScanner: ObservableObject {
     }
     
     private func updateCleanlinessScore(with desktopItems: [DesktopItem]) {
-        guard !desktopItems.isEmpty else {
+        let actionableItems = items
+        guard !actionableItems.isEmpty else {
             cleanlinessScore = DeskCleanlinessScore(fileCount: 0, oldFileCount: 0, averageAge: 0)
             return
         }
         
-        let fileCount = desktopItems.count
-        let oldFileCount = desktopItems.filter { $0.daysOld >= minDaysOld }.count
-        let averageAge = averageAge(for: desktopItems)
-        cleanlinessScore = DeskCleanlinessScore(
+        let fileCount = actionableItems.count
+        let oldAgeThreshold = minDaysOld + 14
+        let oldFileCount = actionableItems.filter { $0.daysOld >= oldAgeThreshold }.count
+        let averageAge = averageAge(for: actionableItems)
+        let scoreValue = DeskCleanlinessScore.computeScore(
             fileCount: fileCount,
             oldFileCount: oldFileCount,
             averageAge: averageAge
+        )
+        cleanlinessScore = DeskCleanlinessScore(
+            fileCount: fileCount,
+            oldFileCount: oldFileCount,
+            averageAge: averageAge,
+            score: scoreValue
         )
     }
     
@@ -244,7 +251,7 @@ class DesktopScanner: ObservableObject {
                 try fileManager.trashItem(at: item.url, resultingItemURL: nil)
                 successCount += 1
             } catch {
-                print("Erreur lors de la mise à la corbeille de \(item.name): \(error)")
+                print("Erreur lors de la mise à la corbeille de \(item.displayName): \(error)")
                 return .failure(error)
             }
         }
@@ -260,7 +267,7 @@ class DesktopScanner: ObservableObject {
         var successCount = 0
         
         for item in itemsToMove {
-            let destination = destinationURL.appendingPathComponent(item.name)
+            let destination = destinationURL.appendingPathComponent(item.displayName)
             
             do {
                 // Gérer les conflits de noms
@@ -278,7 +285,7 @@ class DesktopScanner: ObservableObject {
                 try fileManager.moveItem(at: item.url, to: finalDestination)
                 successCount += 1
             } catch {
-                print("Erreur lors du déplacement de \(item.name): \(error)")
+                print("Erreur lors du déplacement de \(item.displayName): \(error)")
                 return .failure(error)
             }
         }
@@ -325,7 +332,7 @@ private extension DesktopScanner {
         totalItemsCount = items.count
         ignoredItemsCount = ignoredItems.count
         totalItemsSize = items.reduce(Int64(0)) { partial, item in
-            partial + Int64(item.fileSize)
+            partial + item.fileSize
         }
         formattedTotalSize = ByteCountFormatter.string(
             fromByteCount: totalItemsSize,
@@ -359,9 +366,9 @@ private extension DesktopScanner.SortOption {
         case .nameDesc:
             return [.init(\DesktopItem.displayName, order: .reverse)]
         case .dateOldest:
-            return [.init(\DesktopItem.modificationDate, order: .forward)]
+            return [.init(\DesktopItem.lastModified, order: .forward)]
         case .dateNewest:
-            return [.init(\DesktopItem.modificationDate, order: .reverse)]
+            return [.init(\DesktopItem.lastModified, order: .reverse)]
         case .ageHighest:
             return [.init(\DesktopItem.daysOld, order: .reverse)]
         case .ageLowest:
@@ -454,10 +461,20 @@ private final class DesktopScannerPreview: DesktopScanner {
         self.items = filteredItems
         self.ignoredItems = ignoredItems
         setPreviewItemCount(filteredItems.count)
+        let previewFileCount = filteredItems.count
+        let previewOldFileThreshold = minDaysOld + 14
+        let previewOldFileCount = filteredItems.filter { $0.daysOld >= previewOldFileThreshold }.count
+        let previewAverageAge = DesktopScannerPreview.averageAge(for: filteredItems)
+        let previewScore = DeskCleanlinessScore.computeScore(
+            fileCount: previewFileCount,
+            oldFileCount: previewOldFileCount,
+            averageAge: previewAverageAge
+        )
         self.cleanlinessScore = DeskCleanlinessScore(
-            fileCount: previewItemsData.count,
-            oldFileCount: previewItemsData.filter { $0.daysOld >= minDaysOld }.count,
-            averageAge: DesktopScannerPreview.averageAge(for: previewItemsData)
+            fileCount: previewFileCount,
+            oldFileCount: previewOldFileCount,
+            averageAge: previewAverageAge,
+            score: previewScore
         )
         selectedItems.removeAll()
         updateCachedStats()
