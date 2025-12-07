@@ -26,7 +26,7 @@ struct ContentHeaderView: View {
                 .fontWeight(.semibold)
             
             if !scanner.items.isEmpty {
-                Text("\(scanner.items.count) fichier(s) à ranger")
+                Text("\(scanner.items.count) \(scanner.items.count == 1 ? "file" : "files") to clean")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
             }
@@ -39,18 +39,18 @@ struct ContentHeaderView: View {
                 Image(systemName: "arrow.clockwise")
             }
             .buttonStyle(.borderless)
-            .help("Rafraîchir")
+            .help("Refresh")
         }
     }
     
     private var thresholdControls: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("À partir de quand un fichier est-il considéré comme ancien ?")
+            Text("When should a file be considered old?")
                 .font(.subheadline)
                 .multilineTextAlignment(.leading)
             
             HStack(spacing: 8) {
-                Text("Après")
+                Text("After")
                 
                 TextField("", value: $thresholdValue, formatter: NumberFormatter())
                     .frame(width: 60)
@@ -73,7 +73,7 @@ struct ContentHeaderView: View {
                 Spacer()
             }
             
-            Text("Les fichiers présents sur le bureau depuis plus de \(thresholdUnit.formatted(thresholdValue)) seront proposés au rangement.")
+            Text("Files that have been on the desktop for more than \(thresholdUnit.formatted(thresholdValue)) will be suggested for cleanup.")
                 .font(.caption)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.leading)
@@ -82,7 +82,7 @@ struct ContentHeaderView: View {
     
     private var sortRow: some View {
         HStack(spacing: 12) {
-            Text("Filtres actifs : âge ≥ \(thresholdUnit.formatted(thresholdValue))")
+            Text("Active filters: age ≥ \(thresholdUnit.formatted(thresholdValue))")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -95,7 +95,7 @@ struct ContentHeaderView: View {
         
         HStack {
             VStack(alignment: .leading) {
-                Text("Indice de propreté du bureau :")
+                Text("Desktop cleanliness index:")
                     .font(.headline)
                     .padding(3)
                 Text("\(score.score)/100")
@@ -111,7 +111,7 @@ struct ContentHeaderView: View {
                 Spacer()
                 Text(oldFileCountLabel(score.oldFileCount))
                 Spacer()
-                Text("Âge moyen : \(score.formattedAverageAge) jours")
+                Text("Average age: \(score.formattedAverageAge) days")
             }
             .font(.caption)
             .foregroundColor(.secondary)
@@ -140,10 +140,10 @@ struct ContentHeaderView: View {
     }
     
     private func fileCountLabel(_ count: Int) -> String {
-        count > 1 ? "\(count) fichiers" : "\(count) fichier"
+        count > 1 ? "\(count) files" : "\(count) file"
     }
     
     private func oldFileCountLabel(_ count: Int) -> String {
-        count > 1 ? "\(count) fichiers anciens" : "\(count) fichier ancien"
+        count > 1 ? "\(count) old files" : "\(count) old file"
     }
 }

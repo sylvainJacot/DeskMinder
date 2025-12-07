@@ -1,12 +1,15 @@
 import Foundation
 import Combine
 import SwiftUI
+import AppKit
 
 class DesktopScanner: ObservableObject {
     static let allowedDaysRange: ClosedRange<Int> = 1...2000
     
     enum ScannerActionError: Error {
         case recommendedFolderUnavailable
+        case noSelection
+        case userCancelledRecommendedFolder
     }
     
     @Published var items: [DesktopItem] = []
@@ -32,8 +35,9 @@ class DesktopScanner: ObservableObject {
     }
     let fileCountThreshold = 15
     private let ignoredDefaultsKey = "ignoredDesktopItemPaths"
+    private let recommendedFolderWarningKey = "DeskMinderRecommendedFolderWarningShown"
     
-    /// Seuil minimal en jours pour considérer un fichier comme "ancien"
+    /// Minimum age in days for a file to be considered "old"
     @Published var minDaysOld: Int = 7 {
         didSet {
             let clampedValue = min(
@@ -50,16 +54,15 @@ class DesktopScanner: ObservableObject {
         }
     }
     
-    // Options de tri
     enum SortOption: String, CaseIterable {
-        case nameAsc = "Nom (A-Z)"
-        case nameDesc = "Nom (Z-A)"
-        case dateOldest = "Plus ancien"
-        case dateNewest = "Plus récent"
-        case ageHighest = "Âge (décroissant)"
-        case ageLowest = "Âge (croissant)"
-        case sizeAsc = "Taille (croissant)"
-        case sizeDesc = "Taille (décroissant)"
+        case nameAsc = "Name (A-Z)"
+        case nameDesc = "Name (Z-A)"
+        case dateOldest = "Oldest first"
+        case dateNewest = "Newest first"
+        case ageHighest = "Age (descending)"
+        case ageLowest = "Age (ascending)"
+        case sizeAsc = "Size (ascending)"
+        case sizeDesc = "Size (descending)"
         case typeAsc = "Type (A-Z)"
         case typeDesc = "Type (Z-A)"
     }
@@ -78,10 +81,10 @@ class DesktopScanner: ObservableObject {
     }
     
     func refresh() {
-        selectedItems.removeAll() // Désélectionner lors du refresh
+        selectedItems.removeAll() // Clear selection when refreshing
         
         guard let desktopURL = fileManager.urls(for: .desktopDirectory, in: .userDomainMask).first else {
-            print("Impossible de trouver le dossier Desktop")
+            print("Unable to locate the Desktop folder")
             return
         }
         
@@ -132,7 +135,7 @@ class DesktopScanner: ObservableObject {
             }
             
         } catch {
-            print("Erreur en lisant le Desktop : \(error)")
+            print("Error while reading the Desktop: \(error)")
         }
     }
     
@@ -181,7 +184,7 @@ class DesktopScanner: ObservableObject {
         return totalDays / Double(items.count)
     }
     
-    // MARK: - Sélection
+    // MARK: - Selection
     
     func toggleSelection(_ itemId: UUID) {
         if selectedItems.contains(itemId) {
@@ -240,7 +243,7 @@ class DesktopScanner: ObservableObject {
         UserDefaults.standard.set(array, forKey: ignoredDefaultsKey)
     }
     
-    // MARK: - Actions groupées
+    // MARK: - Bulk actions
     
     func moveSelectedToTrash() -> Result<Int, Error> {
         let itemsToDelete = items.filter { selectedItems.contains($0.id) }
@@ -251,12 +254,12 @@ class DesktopScanner: ObservableObject {
                 try fileManager.trashItem(at: item.url, resultingItemURL: nil)
                 successCount += 1
             } catch {
-                print("Erreur lors de la mise à la corbeille de \(item.displayName): \(error)")
+                print("Error moving \(item.displayName) to the Trash: \(error)")
                 return .failure(error)
             }
         }
         
-        // Refresh après suppression
+        // Refresh after deletion
         refresh()
         
         return .success(successCount)
@@ -270,7 +273,7 @@ class DesktopScanner: ObservableObject {
             let destination = destinationURL.appendingPathComponent(item.displayName)
             
             do {
-                // Gérer les conflits de noms
+                // Handle duplicate file names
                 var finalDestination = destination
                 var counter = 1
                 
@@ -285,12 +288,12 @@ class DesktopScanner: ObservableObject {
                 try fileManager.moveItem(at: item.url, to: finalDestination)
                 successCount += 1
             } catch {
-                print("Erreur lors du déplacement de \(item.displayName): \(error)")
+                print("Error while moving \(item.displayName): \(error)")
                 return .failure(error)
             }
         }
         
-        // Refresh après déplacement
+        // Refresh after moving
         refresh()
         
         return .success(successCount)
@@ -300,12 +303,12 @@ class DesktopScanner: ObservableObject {
         let newFolderURL = parentURL.appendingPathComponent(folderName)
         
         do {
-            // Créer le dossier s'il n'existe pas
+            // Create the folder if it does not exist
             if !fileManager.fileExists(atPath: newFolderURL.path) {
                 try fileManager.createDirectory(at: newFolderURL, withIntermediateDirectories: false)
             }
             
-            // Déplacer les fichiers
+            // Move the files
             let result = moveSelectedToFolder(newFolderURL)
             
             switch result {
@@ -320,10 +323,38 @@ class DesktopScanner: ObservableObject {
     }
     
     func moveSelectionToRecommendedFolder() -> Result<URL, Error> {
+        guard !selectedItems.isEmpty else {
+            return .failure(ScannerActionError.noSelection)
+        }
+        
+        let movedCount = selectedItems.count
+        
+        let defaults = UserDefaults.standard
+        let hasShownWarning = defaults.bool(forKey: recommendedFolderWarningKey)
+        
+        if !hasShownWarning {
+            let shouldContinue = showRecommendedFolderWarning()
+            if !shouldContinue {
+                return .failure(ScannerActionError.userCancelledRecommendedFolder)
+            }
+            defaults.set(true, forKey: recommendedFolderWarningKey)
+        }
+        
         guard let documents = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
             return .failure(ScannerActionError.recommendedFolderUnavailable)
         }
-        return createFolderAndMove(folderName: "DeskMinder - Tri", in: documents)
+        
+        let result = createFolderAndMove(folderName: "DeskMinder - Tri", in: documents)
+        
+        if case .success = result {
+            NotificationManager.shared.sendFilesMovedNotification(
+                count: movedCount,
+                destinationDescription: "\"DeskMinder - Tri\" in Documents"
+            )
+            print("ℹ️ DeskMinder: files moved to \"DeskMinder - Tri\" (Documents).")
+        }
+        
+        return result
     }
 }
 
@@ -345,12 +376,39 @@ private extension DesktopScanner {
         guard let maxDays = items.map(\.daysOld).max() else { return nil }
         switch maxDays {
         case 0:
-            return "Aujourd'hui"
+            return "Today"
         case 1:
-            return "1 jour"
+            return "1 day"
         default:
-            return "\(maxDays) jours"
+            return "\(maxDays) days"
         }
+    }
+    
+    @discardableResult
+    func showRecommendedFolderWarning() -> Bool {
+        let alert = NSAlert()
+        alert.messageText = "Where will your files go?"
+        alert.informativeText = """
+The selected files will be moved to:
+
+"DeskMinder - Tri" in your Documents folder.
+
+You can then review and organize everything safely from that folder.
+"""
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "Move files")
+        alert.addButton(withTitle: "Cancel")
+        
+        let dontShowAgainButton = NSButton(checkboxWithTitle: "Don't show this message again", target: nil, action: nil)
+        alert.accessoryView = dontShowAgainButton
+        
+        let response = alert.runModal()
+        
+        if dontShowAgainButton.state == .on {
+            UserDefaults.standard.set(true, forKey: recommendedFolderWarningKey)
+        }
+        
+        return response == .alertFirstButtonReturn
     }
 }
 

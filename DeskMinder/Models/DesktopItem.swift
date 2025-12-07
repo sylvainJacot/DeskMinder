@@ -57,7 +57,7 @@ struct DesktopItem: Identifiable {
 
 #if DEBUG
 extension DesktopItem {
-    /// Jeux de données statiques pour alimenter les previews SwiftUI.
+    /// Static data for SwiftUI previews.
     static var previewItems: [DesktopItem] {
         [
             DesktopItem.preview(
@@ -66,12 +66,12 @@ extension DesktopItem {
                 sizeInKB: 12
             ),
             DesktopItem.preview(
-                name: "Facture-Janvier.pdf",
+                name: "Invoice-January.pdf",
                 daysOld: 42,
                 sizeInKB: 320
             ),
             DesktopItem.preview(
-                name: "Présentation.key",
+                name: "Presentation.key",
                 daysOld: 18,
                 sizeInKB: 9_850
             ),
@@ -81,12 +81,12 @@ extension DesktopItem {
                 sizeInKB: 2_048
             ),
             DesktopItem.preview(
-                name: "Capture.png",
+                name: "Screenshot.png",
                 daysOld: 12,
                 sizeInKB: 940
             ),
             DesktopItem.preview(
-                name: "Archive-Projet.zip",
+                name: "Project-Archive.zip",
                 daysOld: 110,
                 sizeInKB: 32_768
             ),
@@ -105,8 +105,8 @@ extension DesktopItem {
     
     static var previewIgnoredPaths: Set<String> {
         let names = [
-            "Facture-Janvier.pdf",
-            "Archive-Projet.zip"
+            "Invoice-January.pdf",
+            "Project-Archive.zip"
         ]
         return Set(
             names.map { previewURL(for: $0).path }

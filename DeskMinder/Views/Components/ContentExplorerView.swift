@@ -49,6 +49,8 @@ struct ContentExplorerView: View {
             }
             .padding(.horizontal)
             .padding(.vertical, 12)
+            
+            statusBar
         }
     }
     
@@ -67,7 +69,7 @@ struct ContentExplorerView: View {
         HStack() {
             
             if scanner.selectedCount > 0 {
-                Text("\(scanner.selectedCount) sélectionné(s)")
+                Text("\(scanner.selectedCount) selected")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                 
@@ -76,7 +78,7 @@ struct ContentExplorerView: View {
                 Button {
                     showingFolderPicker = true
                 } label: {
-                    Label("Déplacer vers…", systemImage: "folder")
+                    Label("Move to...", systemImage: "folder")
                 }
                 .buttonStyle(.borderless)
                 .popover(isPresented: $showingFolderPicker) {
@@ -87,7 +89,7 @@ struct ContentExplorerView: View {
                 Button {
                     showingDeleteConfirmation = true
                 } label: {
-                    Label("Corbeille", systemImage: "trash")
+                    Label("Move to Trash", systemImage: "trash")
                 }
                 .buttonStyle(.borderless)
                 .foregroundColor(.red)
@@ -125,12 +127,24 @@ struct ContentExplorerView: View {
         }
     }
     
+    private var statusBar: some View {
+        HStack {
+            Text(statusBarText)
+                .font(.caption)
+                .foregroundColor(.secondary)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal)
+        .padding(.bottom, 12)
+    }
+    
     @ViewBuilder
     private var tableView: some View {
         Table(of: DesktopItem.self,
               selection: $scanner.selectedItems,
               sortOrder: $scanner.sortOrder) {
-            TableColumn("Nom", value: \DesktopItem.displayName) { item in
+            TableColumn("Name", value: \DesktopItem.displayName) { item in
                 HStack(spacing: 8) {
                     FileThumbnailView(url: item.url)
                         .frame(width: 32, height: 32)
@@ -142,14 +156,14 @@ struct ContentExplorerView: View {
                 .contentShape(Rectangle())
             }
             
-            TableColumn("Date modifiée", value: \DesktopItem.lastModified) { item in
+            TableColumn("Date Modified", value: \DesktopItem.lastModified) { item in
                 Text(item.formattedLastModified)
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
             
-            TableColumn("Taille", value: \DesktopItem.fileSize) { item in
+            TableColumn("Size", value: \DesktopItem.fileSize) { item in
                 Text(item.formattedFileSize)
                     .font(.callout)
                     .monospacedDigit()
@@ -184,19 +198,19 @@ struct ContentExplorerView: View {
     
     @ViewBuilder
     private func tableRowContextMenu(for item: DesktopItem) -> some View {
-        Button("Afficher dans le Finder") {
+        Button("Reveal in Finder") {
             revealInFinder(item)
         }
         
         Divider()
         
-        Button(isShowingIgnoredList ? "Autoriser à nouveau le rangement" : "Ne jamais proposer de ranger ce fichier") {
+        Button(isShowingIgnoredList ? "Allow cleanup suggestions again" : "Never suggest cleaning this file") {
             scanner.toggleIgnored(item)
         }
         
         if !isShowingIgnoredList {
             Divider()
-            Button(scanner.selectedItems.contains(item.id) ? "Désélectionner" : "Sélectionner") {
+            Button(scanner.selectedItems.contains(item.id) ? "Deselect" : "Select") {
                 scanner.toggleSelection(item.id)
             }
         }
@@ -207,7 +221,39 @@ struct ContentExplorerView: View {
     }
     
     private var emptyStateText: String {
-        isShowingIgnoredList ? "Aucun fichier ignoré." : "Aucun fichier à ranger 🎉"
+        isShowingIgnoredList ? "No ignored files." : "Nothing to clean 🎉"
+    }
+    
+    private var statusBarText: String {
+        let items = currentItems
+        let total = items.count
+        let fileWord = total == 1 ? "file" : "files"
+        
+        let base: String
+        switch selectedTab {
+        case .toClean:
+            base = "\(total) \(fileWord) to review"
+        case .ignored:
+            base = "\(total) \(fileWord) ignored"
+        }
+        
+        let selectedItems = items.filter { scanner.selectedItems.contains($0.id) }
+        let selectionCount = selectedItems.count
+        var components = [base, "\(selectionCount) selected"]
+        
+        if selectionCount > 0, let sizeText = selectedItemsSizeDescription(for: selectedItems) {
+            components.append("Selected size: \(sizeText)")
+        }
+        
+        return components.joined(separator: " — ")
+    }
+    
+    private func selectedItemsSizeDescription(for selectedItems: [DesktopItem]) -> String? {
+        let totalBytes = selectedItems.reduce(Int64(0)) { partial, item in
+            partial + item.fileSize
+        }
+        guard totalBytes > 0 else { return nil }
+        return ByteCountFormatter.string(fromByteCount: totalBytes, countStyle: .file)
     }
     
     // MARK: - Helpers

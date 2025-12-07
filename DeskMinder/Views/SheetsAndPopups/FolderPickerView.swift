@@ -10,18 +10,18 @@ struct FolderPickerView: View {
         let fm = FileManager.default
         return [
             ("Documents", fm.urls(for: .documentDirectory, in: .userDomainMask).first),
-            ("Images", fm.urls(for: .picturesDirectory, in: .userDomainMask).first),
-            ("Téléchargements", fm.urls(for: .downloadsDirectory, in: .userDomainMask).first)
+            ("Pictures", fm.urls(for: .picturesDirectory, in: .userDomainMask).first),
+            ("Downloads", fm.urls(for: .downloadsDirectory, in: .userDomainMask).first)
         ]
     }()
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Déplacer vers un dossier")
+            Text("Move to a folder")
                 .font(.headline)
             
             VStack(alignment: .leading, spacing: 8) {
-                Text("Dossiers rapides")
+                Text("Quick folders")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                 
@@ -52,7 +52,7 @@ struct FolderPickerView: View {
             } label: {
                 HStack {
                     Image(systemName: "folder.badge.plus")
-                    Text("Choisir un autre dossier…")
+                    Text("Choose another folder...")
                     Spacer()
                 }
             }
@@ -64,7 +64,7 @@ struct FolderPickerView: View {
             } label: {
                 HStack {
                     Image(systemName: "folder.badge.plus")
-                    Text("Créer un nouveau dossier…")
+                    Text("Create a new folder...")
                     Spacer()
                 }
             }
@@ -77,8 +77,8 @@ struct FolderPickerView: View {
     private func iconForFolder(_ name: String) -> String {
         switch name {
         case "Documents": return "doc.fill"
-        case "Images": return "photo.fill"
-        case "Téléchargements": return "arrow.down.circle.fill"
+        case "Pictures": return "photo.fill"
+        case "Downloads": return "arrow.down.circle.fill"
         default: return "folder.fill"
         }
     }
@@ -88,10 +88,10 @@ struct FolderPickerView: View {
         
         switch result {
         case .success(let count):
-            print("✅ \(count) fichier(s) déplacé(s)")
+            print("✅ \(count) file(s) moved")
             dismiss()
         case .failure(let error):
-            print("❌ Erreur : \(error.localizedDescription)")
+            print("❌ Error: \(error.localizedDescription)")
         }
     }
     
@@ -100,11 +100,10 @@ struct FolderPickerView: View {
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
-        panel.message = "Choisissez un dossier de destination"
+        panel.message = "Choose a destination folder"
         
         if panel.runModal() == .OK, let url = panel.url {
             moveToFolder(url)
         }
     }
 }
-

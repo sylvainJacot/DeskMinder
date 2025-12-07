@@ -8,7 +8,7 @@ struct NewFolderSheet: View {
     @State private var selectedLocation: FolderLocation = .desktop
     
     enum FolderLocation: String, CaseIterable {
-        case desktop = "Bureau"
+        case desktop = "Desktop"
         case documents = "Documents"
         
         var url: URL? {
@@ -24,13 +24,13 @@ struct NewFolderSheet: View {
     
     var body: some View {
         VStack(spacing: 20) {
-            Text("Créer un nouveau dossier")
+            Text("Create a new folder")
                 .font(.headline)
             
-            TextField("Nom du dossier", text: $folderName)
+            TextField("Folder name", text: $folderName)
                 .textFieldStyle(.roundedBorder)
             
-            Picker("Emplacement", selection: $selectedLocation) {
+            Picker("Location", selection: $selectedLocation) {
                 ForEach(FolderLocation.allCases, id: \.self) { location in
                     Text(location.rawValue).tag(location)
                 }
@@ -38,14 +38,14 @@ struct NewFolderSheet: View {
             .pickerStyle(.segmented)
             
             HStack {
-                Button("Annuler") {
+                Button("Cancel") {
                     dismiss()
                 }
                 .keyboardShortcut(.cancelAction)
                 
                 Spacer()
                 
-                Button("Créer et déplacer") {
+                Button("Create and move") {
                     createFolderAndMove()
                 }
                 .keyboardShortcut(.defaultAction)
@@ -63,10 +63,10 @@ struct NewFolderSheet: View {
         
         switch result {
         case .success(let folderURL):
-            print("✅ Dossier créé et fichiers déplacés vers : \(folderURL.path)")
+            print("✅ Folder created and files moved to: \(folderURL.path)")
             dismiss()
         case .failure(let error):
-            print("❌ Erreur : \(error.localizedDescription)")
+            print("❌ Error: \(error.localizedDescription)")
         }
     }
 }

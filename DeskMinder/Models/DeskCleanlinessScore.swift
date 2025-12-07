@@ -50,7 +50,7 @@ struct DeskCleanlinessScore: Equatable {
         return .medium
     }
     
-    /// Fournit une valeur réaliste pour les aperçus SwiftUI.
+    /// Provides a realistic value for SwiftUI previews.
     static func mock() -> DeskCleanlinessScore {
         DeskCleanlinessScore(
             fileCount: 24,
@@ -80,22 +80,22 @@ extension DeskCleanlinessScore {
     var qualitativeLabel: String {
         switch level {
         case .good:
-            return "Bureau propre"
+            return "Clean Desktop"
         case .medium:
-            return "Bureau à surveiller"
+            return "Needs Attention"
         case .bad:
-            return "Bureau encombré"
+            return "Cluttered Desktop"
         }
     }
     
     var localizedDescription: String {
         switch level {
         case .good:
-            return "Ton bureau est globalement clean, rien d’urgent."
+            return "Your desktop looks tidy overall and nothing seems urgent."
         case .medium:
-            return "Ton bureau commence à se charger, tu peux envisager un petit tri."
+            return "Your desktop is starting to fill up. Consider a quick cleanup."
         case .bad:
-            return "Ton bureau est très encombré et contient de vieux fichiers, il est temps de ranger."
+            return "Your desktop is heavily cluttered and packed with old files. It's time to tidy up."
         }
     }
     
@@ -104,11 +104,11 @@ extension DeskCleanlinessScore {
         let hasOldFiles = oldFileCount > 0
         
         if hasOldFiles {
-            computedScore -= min(fileCount * 2, 30)            // surcharge : max -30
-            computedScore -= min(Int(averageAge * 1.2), 30)    // âge moyen élevé : max -30
+            computedScore -= min(fileCount * 2, 30)            // clutter penalty: max -30
+            computedScore -= min(Int(averageAge * 1.2), 30)    // high average age penalty: max -30
         }
         
-        computedScore -= min(oldFileCount * 3, 40)             // fichiers anciens : max -40
+        computedScore -= min(oldFileCount * 3, 40)             // old files: max -40
         return max(0, min(computedScore, 100))
     }
 }

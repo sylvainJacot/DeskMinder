@@ -12,7 +12,7 @@ struct DeskMinderApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
     var body: some Scene {
-        // Pas de fenêtre principale, juste éventuellement des réglages
+        // No main window, only optional settings
         Settings {
             EmptyView()
         }

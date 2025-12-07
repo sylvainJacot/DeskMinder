@@ -21,14 +21,14 @@ final class NotificationManager: NSObject, ObservableObject {
         registerCategory()
     }
     
-    /// Appelez requestAuthorization() dans AppDelegate.applicationDidFinishLaunching depuis Xcode,
-    /// puis dépassez le seuil depuis DesktopScanner pour tester l’affichage des notifications locales.
+    /// Call requestAuthorization() from AppDelegate.applicationDidFinishLaunching,
+    /// then exceed the threshold via DesktopScanner to test local notifications.
     func requestAuthorization() {
         notificationCenter.requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
             if let error = error {
-                print("Erreur lors de la demande d’autorisation de notification : \(error)")
+                print("Error requesting notification authorization: \(error)")
             } else if !granted {
-                print("L’utilisateur a refusé les notifications DeskMinder.")
+                print("The user denied DeskMinder notifications.")
             }
         }
     }
@@ -38,9 +38,9 @@ final class NotificationManager: NSObject, ObservableObject {
         guard shouldSendNotificationToday() else { return }
         
         let content = UNMutableNotificationContent()
-        content.title = "Votre bureau commence à être encombré 🧹"
-        content.subtitle = "Vous avez \(count) fichiers sur votre bureau."
-        content.body = "Pensez à jeter un coup d'œil : certains ont peut-être dépassé votre seuil de conservation."
+        content.title = "Your desktop is getting cluttered 🧹"
+        content.subtitle = "You currently have \(count) files on your desktop."
+        content.body = "Take a look - some of them might already be older than your retention threshold."
         content.sound = .default
         content.categoryIdentifier = categoryIdentifier
         
@@ -52,9 +52,32 @@ final class NotificationManager: NSObject, ObservableObject {
         
         notificationCenter.add(request) { [weak self] error in
             if let error = error {
-                print("Erreur lors de la programmation de la notification DeskMinder : \(error)")
+                print("Error scheduling the DeskMinder notification: \(error)")
             } else if let self = self {
                 self.userDefaults.set(Date(), forKey: self.lastNotificationKey)
+            }
+        }
+    }
+    
+    func sendFilesMovedNotification(count: Int, destinationDescription: String) {
+        let content = UNMutableNotificationContent()
+        content.title = "Files organized"
+        if count == 1 {
+            content.body = "1 file was moved to \(destinationDescription)."
+        } else {
+            content.body = "\(count) files were moved to \(destinationDescription)."
+        }
+        content.sound = .default
+        
+        let request = UNNotificationRequest(
+            identifier: UUID().uuidString,
+            content: content,
+            trigger: nil
+        )
+        
+        notificationCenter.add(request) { error in
+            if let error = error {
+                print("Error scheduling the DeskMinder notification: \(error)")
             }
         }
     }
@@ -70,7 +93,7 @@ final class NotificationManager: NSObject, ObservableObject {
     private func registerCategory() {
         let openAction = UNNotificationAction(
             identifier: openActionIdentifier,
-            title: "Ouvrir DeskMinder",
+            title: "Open DeskMinder",
             options: [.foreground]
         )
         

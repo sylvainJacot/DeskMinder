@@ -6,7 +6,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem!
     let popover = NSPopover()
     
-    // On partage un scanner unique pour toute l’app
+    // Share a single scanner across the entire app
     let scanner = DesktopScanner()
     private var cancellables = Set<AnyCancellable>()
     
@@ -15,7 +15,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // 1. Icône barre de menu
+        // 1. Menu bar icon
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         
         if let button = statusItem.button {
@@ -24,7 +24,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             button.action = #selector(togglePopover(_:))
         }
         
-        // 2. Popover avec vue SwiftUI
+        // 2. Popover with SwiftUI view
         popover.behavior = .applicationDefined
         let screenHeight = NSScreen.main?.visibleFrame.height ?? 0
         let popoverHeight = screenHeight > 0 ? screenHeight * 0.9 : 500
@@ -32,7 +32,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         popover.contentViewController = NSHostingController(
             rootView: ContentView(scanner: scanner)
         )
-        NotificationManager.shared.requestAuthorization() // Appelé au lancement; lancer l’app via Xcode et dépasser le seuil pour tester les notifications.
+        NotificationManager.shared.requestAuthorization() // Request permissions when the app launches.
         
         updateStatusItem(for: scanner.cleanlinessScore)
         
@@ -138,7 +138,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func makeCheckBadgeImage() -> NSImage? {
-        guard let baseSymbol = NSImage(systemSymbolName: "checkmark", accessibilityDescription: "Bureau propre") else {
+        guard let baseSymbol = NSImage(systemSymbolName: "checkmark", accessibilityDescription: "Clean desktop") else {
             return nil
         }
         

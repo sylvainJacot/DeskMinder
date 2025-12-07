@@ -11,8 +11,8 @@ struct ContentView: View {
         
         var title: String {
             switch self {
-            case .toClean: return "À ranger"
-            case .ignored: return "Ignorés"
+            case .toClean: return "To Clean"
+            case .ignored: return "Ignored"
             }
         }
     }
@@ -26,9 +26,9 @@ struct ContentView: View {
         
         var label: String {
             switch self {
-            case .days:   return "jours"
-            case .months: return "mois"
-            case .years:  return "ans"
+            case .days:   return "days"
+            case .months: return "months"
+            case .years:  return "years"
             }
         }
         
@@ -46,11 +46,11 @@ struct ContentView: View {
         func formatted(_ value: Int) -> String {
             switch self {
             case .days:
-                return value == 1 ? "1 jour" : "\(value) jours"
+                return value == 1 ? "1 day" : "\(value) days"
             case .months:
-                return value == 1 ? "1 mois" : "\(value) mois"
+                return value == 1 ? "1 month" : "\(value) months"
             case .years:
-                return value == 1 ? "1 an" : "\(value) ans"
+                return value == 1 ? "1 year" : "\(value) years"
             }
         }
     }
@@ -90,13 +90,13 @@ struct ContentView: View {
             transaction.animation = nil
         }
         .frame(minWidth: 760, minHeight: 420)
-        .alert("Confirmer la suppression", isPresented: $showingDeleteConfirmation) {
-            Button("Annuler", role: .cancel) { }
-            Button("Mettre à la corbeille", role: .destructive) {
+        .alert("Confirm deletion", isPresented: $showingDeleteConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Move to Trash", role: .destructive) {
                 handleMoveToTrash()
             }
         } message: {
-            Text("Voulez-vous déplacer \(scanner.selectedCount) fichier(s) vers la corbeille ?")
+            Text("Move \(scanner.selectedCount) selected file(s) to the Trash?")
         }
         .sheet(isPresented: $showingNewFolderSheet) {
             NewFolderSheet(scanner: scanner)
@@ -157,10 +157,10 @@ struct ContentView: View {
         
         switch result {
         case .success(let count):
-            print("✅ \(count) fichier(s) déplacé(s) vers la corbeille")
+            print("✅ \(count) file(s) moved to the Trash")
         case .failure(let error):
-            print("❌ Erreur : \(error.localizedDescription)")
-            // TODO: Afficher une alerte d'erreur
+            print("❌ Error: \(error.localizedDescription)")
+            // TODO: Present an error alert
         }
     }
     
@@ -294,7 +294,7 @@ struct ContentView: View {
 }
 
 #if DEBUG
-#Preview("Vue principale") {
+#Preview("Main view") {
     ContentView(
         scanner: .preview(
             minDaysOld: 5,
@@ -304,7 +304,7 @@ struct ContentView: View {
     .frame(width: 960, height: 520)
 }
 
-#Preview("Tri par taille") {
+#Preview("Sort by size") {
     ContentView(
         scanner: .preview(
             itemsCount: 5,
