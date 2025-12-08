@@ -102,7 +102,13 @@ struct FolderPickerView: View {
         panel.allowsMultipleSelection = false
         panel.message = "Choose a destination folder"
         
-        if panel.runModal() == .OK, let url = panel.url {
+        if let window = NSApp.keyWindow {
+            panel.beginSheetModal(for: window) { response in
+                if response == .OK, let url = panel.url {
+                    moveToFolder(url)
+                }
+            }
+        } else if panel.runModal() == .OK, let url = panel.url {
             moveToFolder(url)
         }
     }

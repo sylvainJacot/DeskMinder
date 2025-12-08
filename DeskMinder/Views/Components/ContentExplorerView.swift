@@ -39,16 +39,13 @@ struct ContentExplorerView: View {
                 Divider()
             }
             
-            ZStack {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color(nsColor: .windowBackgroundColor))
-                    .shadow(color: Color.black.opacity(0.08), radius: 1, y: 1)
-                
-                currentContent
-                    .padding(12)
-            }
-            .padding(.horizontal)
-            .padding(.vertical, 12)
+            currentContent
+                .padding(12)
+                .background(.regularMaterial)
+                .cornerRadius(12)
+                .shadow(radius: 3, y: 2)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
             
             statusBar
         }
@@ -59,10 +56,12 @@ struct ContentExplorerView: View {
     private var tabPicker: some View {
         Picker("", selection: $selectedTab) {
             ForEach(ContentView.ListTab.allCases) { tab in
-                Text(tab.title).tag(tab)
+                Text(tabLabel(for: tab)).tag(tab)
             }
         }
         .pickerStyle(.segmented)
+        .font(.headline)
+        .padding(.horizontal)
     }
     
     private var selectionToolbar: some View {
@@ -118,6 +117,15 @@ struct ContentExplorerView: View {
         }
     }
     
+    private func tabLabel(for tab: ContentView.ListTab) -> String {
+        switch tab {
+        case .toClean:
+            return "To Clean (\(scanner.items.count))"
+        case .ignored:
+            return "Ignored (\(scanner.ignoredItems.count))"
+        }
+    }
+    
     private var currentItems: [DesktopItem] {
         switch selectedTab {
         case .toClean:
@@ -136,7 +144,7 @@ struct ContentExplorerView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal)
-        .padding(.bottom, 12)
+        .padding(.bottom, 6)
     }
     
     @ViewBuilder

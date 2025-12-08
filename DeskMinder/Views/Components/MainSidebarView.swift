@@ -47,27 +47,30 @@ struct MainSidebarView: View {
                 .fontWeight(.semibold)
             
             if let score = scanner.currentScore {
-                let copy = scoreCopy(for: score.level)
+                let title = scoreTitle(for: score.level)
                 VStack(alignment: .leading, spacing: 8) {
-                    HStack(alignment: .center, spacing: 12) {
-                        Text(score.percentageFormatted)
-                            .font(.system(size: 34, weight: .bold, design: .rounded))
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("\(scanner.items.count)")
+                            .font(.system(size: 42, weight: .bold, design: .rounded))
                             .foregroundColor(scoreAccentColor(for: score))
-                        
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(copy.title)
-                                .font(.headline)
-                            Text(copy.description)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .lineLimit(3)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
+                        Text("files to clean")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        Text(score.localizedDescription)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                    
-                    Text(scoreMiniStatsText(for: score))
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+
+                    Divider().padding(.vertical, 6)
+
+                    HStack(spacing: 12) {
+                        Label("\(score.fileCount)", systemImage: "doc.on.doc")
+                        Label("\(score.oldFileCount) old", systemImage: "clock")
+                        Label("avg \(formattedAverageAgeValue(for: score)) d", systemImage: "timer")
+                    }
+                    .font(.caption)
+                    .foregroundColor(.secondary)
                 }
             } else {
                 Text("No recent scan")
@@ -79,7 +82,10 @@ struct MainSidebarView: View {
     
     private var statsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionTitle("Statistics")
+            Label("Statistics", systemImage: "chart.bar")
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(.primary)
+                .textCase(.uppercase)
             
             statRow(label: "Files to review", value: "\(scanner.items.count)")
             statRow(label: "Selected", value: "\(scanner.selectedItems.count)")
@@ -91,7 +97,10 @@ struct MainSidebarView: View {
     
     private var quickActionsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionTitle("Quick Actions")
+            Label("Quick Actions", systemImage: "bolt.circle")
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(.primary)
+                .textCase(.uppercase)
             
             Button {
                 scanner.refresh()
@@ -104,64 +113,77 @@ struct MainSidebarView: View {
             }
             .buttonStyle(.plain)
             
-            Button {
-                _ = scanner.moveSelectionToRecommendedFolder()
-            } label: {
-                actionButtonLabel(
-                    title: "Move to Recommended Folder",
-                    subtitle: "Moves the selected files to \"DeskMinder - Tri\" in your Documents.",
-                    systemImage: "folder.badge.gearshape"
-                )
-            }
-            .buttonStyle(.plain)
-            .disabled(scanner.selectedItems.isEmpty)
-            
             Button(role: .destructive) {
                 _ = scanner.moveSelectedToTrash()
             } label: {
                 actionButtonLabel(
                     title: "Move Selected Files to Trash",
                     subtitle: "Deletes the selected files.",
-                    systemImage: "trash"
+                    systemImage: "trash",
+                    iconColor: .red,
+                    titleColor: .red
                 )
             }
             .buttonStyle(.plain)
             .disabled(scanner.selectedItems.isEmpty)
+
+            Button(role: .destructive) {
+                _ = scanner.moveAllToTrash()
+            } label: {
+                Label("Delete All", systemImage: "trash.fill")
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.red)
+            .disabled(scanner.items.isEmpty)
+
+            Text("Move all listed files to Trash.")
+                .font(.caption)
+                .foregroundColor(.secondary)
         }
     }
     
     private var filtersSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionTitle("Filters & Thresholds")
+            Label("Filters & Thresholds", systemImage: "line.3.horizontal.decrease.circle")
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(.primary)
+                .textCase(.uppercase)
             
             VStack(alignment: .leading, spacing: 8) {
-                Text("Minimum File Age")
-                    .font(.subheadline)
-                    .foregroundColor(.primary)
-                
-                TextField("Value", text: Binding(
-                    get: { String(Int(thresholdValue)) },
-                    set: { newValue in
-                        if let v = Int(newValue) {
-                            thresholdValue = Double(v)
+                HStack(spacing: 6) {
+                    Image(systemName: "clock.arrow.circlepath")
+                        .foregroundColor(.secondary)
+                    Text("Minimum file age")
+                        .font(.subheadline.weight(.medium))
+                }
+
+                HStack(spacing: 12) {
+                    TextField("Value", text: Binding(
+                        get: { String(Int(thresholdValue)) },
+                        set: { newValue in
+                            if let v = Int(newValue) {
+                                thresholdValue = Double(v)
+                            }
+                        }
+                    ))
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 72)
+
+                    Picker("Unit", selection: $thresholdUnit) {
+                        ForEach(ContentView.ThresholdUnit.allCases) { unit in
+                            Text(unit.label.capitalized).tag(unit)
                         }
                     }
-                ))
-                .textFieldStyle(.roundedBorder)
-                
+                    .frame(width: 120)
+                }
+
                 Text("Only show files modified at least this long ago.")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
-            
-            VStack(alignment: .leading, spacing: 8) {
-                Picker("Age Unit", selection: $thresholdUnit) {
-                    ForEach(ContentView.ThresholdUnit.allCases) { unit in
-                        Text(unit.label.capitalized).tag(unit)
-                    }
-                }
-                .pickerStyle(.segmented)
-            }
+            .padding()
+            .background(Color.secondary.opacity(0.1))
+            .cornerRadius(10)
             
             Text("Active filters: age ≥ \(thresholdUnit.formatted(Int(thresholdValue)))")
                 .font(.caption)
@@ -206,16 +228,22 @@ struct MainSidebarView: View {
         .padding(.vertical, 2)
     }
     
-    private func actionButtonLabel(title: String, subtitle: String, systemImage: String) -> some View {
+    private func actionButtonLabel(
+        title: String,
+        subtitle: String,
+        systemImage: String,
+        iconColor: Color = .accentColor,
+        titleColor: Color = .primary
+    ) -> some View {
         HStack(alignment: .center, spacing: 10) {
             Image(systemName: systemImage)
                 .font(.title3)
-                .foregroundColor(.accentColor)
+                .foregroundColor(iconColor)
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.subheadline)
-                    .foregroundColor(.primary)
+                    .foregroundColor(titleColor)
                 Text(subtitle)
                     .font(.caption)
                     .foregroundColor(.secondary)
@@ -237,14 +265,14 @@ struct MainSidebarView: View {
         }
     }
     
-    private func scoreCopy(for level: DeskCleanlinessScore.Level) -> (title: String, description: String) {
+    private func scoreTitle(for level: DeskCleanlinessScore.Level) -> String {
         switch level {
         case .good:
-            return ("Clean Desktop", "Your desktop looks tidy overall. Enjoy it while it lasts.")
+            return "Clean Desktop"
         case .medium:
-            return ("Needs Attention", "Some files are piling up. A quick tidy from time to time will keep it under control.")
+            return "Needs Attention"
         case .bad:
-            return ("Cluttered Desktop", "Your desktop is heavily cluttered and packed with old files. It's the right moment to tidy up.")
+            return "Cluttered Desktop"
         }
     }
     

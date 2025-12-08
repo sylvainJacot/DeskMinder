@@ -91,11 +91,11 @@ extension DeskCleanlinessScore {
     var localizedDescription: String {
         switch level {
         case .good:
-            return "Your desktop looks tidy overall and nothing seems urgent."
+            return "Your desktop looks clean."
         case .medium:
-            return "Your desktop is starting to fill up. Consider a quick cleanup."
+            return "Some older files are starting to accumulate."
         case .bad:
-            return "Your desktop is heavily cluttered and packed with old files. It's time to tidy up."
+            return "Your desktop contains many old files. It's a good time to tidy up."
         }
     }
     
