@@ -59,12 +59,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     
-    private func showPopover() {
-        guard let button = statusItem.button else { return }
-        NSApp.activate(ignoringOtherApps: true)
-        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-        popover.contentViewController?.view.window?.makeKey()
-    }
+private func showPopover() {
+    guard let button = statusItem.button else { return }
+
+    // 1. On définit une taille MAXIMALE raisonnable (pas fixe !)
+    popover.contentSize = NSSize(width: 900, height: 640) // ou 960×700 si tu veux plus grand
+
+    // 2. On laisse NSPopover calculer tout seul le meilleur positionnement
+    popover.show(relativeTo: button.bounds, of: button, preferredEdge: .maxY)
+
+    // 3. LA LIGNE MAGIQUE QUI RÉSOUT TOUT
+    popover.contentViewController?.view.window?.level = .floating
+
+    // Optionnel : focus fort pour que les raccourcis clavier marchent tout de suite
+    NSApp.activate(ignoringOtherApps: true)
+    popover.contentViewController?.view.window?.makeKeyAndOrderFront(nil)
+}
     
     @objc private func handleOpenPopoverRequest() {
         showPopover()

@@ -13,6 +13,7 @@ class DesktopScanner: ObservableObject {
     @Published var selectedItems: Set<UUID> = [] {
         didSet {
             selectedItemsCount = selectedItems.count
+            updateSelectedStats()
         }
     }
     @Published private(set) var totalItemsCount: Int = 0
@@ -20,6 +21,8 @@ class DesktopScanner: ObservableObject {
     @Published private(set) var ignoredItemsCount: Int = 0
     @Published private(set) var totalItemsSize: Int64 = 0
     @Published private(set) var formattedTotalSize: String = ByteCountFormatter.string(fromByteCount: 0, countStyle: .file)
+    @Published private(set) var selectedItemsSize: Int64 = 0
+    @Published private(set) var formattedSelectedTotalSize: String = ByteCountFormatter.string(fromByteCount: 0, countStyle: .file)
     @Published private(set) var oldestItemAgeDescription: String?
     @Published var cleanlinessScore: DeskCleanlinessScore?
     @Published var sortOrder: [KeyPathComparator<DesktopItem>] = DesktopScanner.defaultSortOrder {
@@ -351,6 +354,16 @@ private extension DesktopScanner {
             countStyle: .file
         )
         oldestItemAgeDescription = Self.makeOldestItemDescription(from: items)
+        updateSelectedStats()
+    }
+
+    private func updateSelectedStats() {
+        let selected = items.filter { selectedItems.contains($0.id) }
+        selectedItemsSize = selected.reduce(Int64(0)) { $0 + $1.fileSize }
+        formattedSelectedTotalSize = ByteCountFormatter.string(
+            fromByteCount: selectedItemsSize,
+            countStyle: .file
+        )
     }
     
     static func makeOldestItemDescription(from items: [DesktopItem]) -> String? {

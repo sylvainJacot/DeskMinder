@@ -87,10 +87,10 @@ struct MainSidebarView: View {
                 .foregroundColor(.primary)
                 .textCase(.uppercase)
             
-            statRow(label: "Files to review", value: "\(scanner.items.count)")
-            statRow(label: "Selected", value: "\(scanner.selectedItems.count)")
-            statRow(label: "Ignored", value: "\(scanner.ignoredItems.count)")
-            statRow(label: "Total size", value: scanner.formattedTotalSize)
+            statRow(label: "Files to review", value: "\(scanner.items.count)", isBold: true)
+            statRow(label: "Selected", value: "\(scanner.selectedItems.count)", isBold: true)
+            statRow(label: "Selected size", value: scanner.formattedSelectedTotalSize, isBold: true)
+            statRow(label: "Total size", value: scanner.formattedTotalSize, isBold: true)
             statRow(label: "Oldest file", value: oldestFileStatText)
         }
     }
@@ -130,15 +130,16 @@ struct MainSidebarView: View {
             Button(role: .destructive) {
                 _ = scanner.moveAllToTrash()
             } label: {
-                Label("Delete All", systemImage: "trash.fill")
+                actionButtonLabel(
+                    title: "Move all Files to Trash",
+                    subtitle: "Deletes all files.",
+                    systemImage: "trash",
+                    iconColor: .red,
+                    titleColor: .red
+                )
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.red)
+            .buttonStyle(.plain)
             .disabled(scanner.items.isEmpty)
-
-            Text("Move all listed files to Trash.")
-                .font(.caption)
-                .foregroundColor(.secondary)
         }
     }
     
@@ -176,10 +177,6 @@ struct MainSidebarView: View {
                     }
                     .frame(width: 120)
                 }
-
-                Text("Only show files modified at least this long ago.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
             }
             .padding()
             .background(Color.secondary.opacity(0.1))
@@ -215,7 +212,7 @@ struct MainSidebarView: View {
             .foregroundColor(.primary)
     }
     
-    private func statRow(label: String, value: String) -> some View {
+    private func statRow(label: String, value: String, isBold: Bool = false) -> some View {
         HStack {
             Text(label)
                 .font(.callout)
@@ -223,6 +220,7 @@ struct MainSidebarView: View {
             Spacer()
             Text(value)
                 .font(.callout)
+                .fontWeight(isBold ? .bold : .regular)
                 .foregroundColor(.secondary)
         }
         .padding(.vertical, 2)

@@ -89,7 +89,7 @@ struct ContentView: View {
         .transaction { transaction in
             transaction.animation = nil
         }
-        .frame(minWidth: 760, minHeight: 420)
+.frame(minWidth: 800, maxWidth: 1000, minHeight: 720, maxHeight: 820)
         .alert("Confirm deletion", isPresented: $showingDeleteConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button("Move to Trash", role: .destructive) {
