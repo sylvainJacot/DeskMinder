@@ -88,7 +88,7 @@ struct ContentExplorerView: View {
                 Button {
                     showingDeleteConfirmation = true
                 } label: {
-                    Label("Move to Trash", systemImage: "trash")
+                    Label("Move to Bin", systemImage: "trash")
                 }
                 .buttonStyle(.borderless)
                 .foregroundColor(.red)

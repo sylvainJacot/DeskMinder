@@ -5,6 +5,8 @@ struct MainSidebarView: View {
     @Binding var thresholdValue: Double
     @Binding var thresholdUnit: ContentView.ThresholdUnit
     @Binding var autoCleanEnabled: Bool
+    @State private var showConfirmMoveAllToTrash: Bool = false
+    @State private var showConfirmMoveSelectedToTrash: Bool = false
     
     private let sliderRange = Double(DesktopScanner.allowedDaysRange.lowerBound)...Double(DesktopScanner.allowedDaysRange.upperBound)
     
@@ -114,10 +116,10 @@ struct MainSidebarView: View {
             .buttonStyle(.plain)
             
             Button(role: .destructive) {
-                _ = scanner.moveSelectedToTrash()
+                showConfirmMoveSelectedToTrash = true
             } label: {
                 actionButtonLabel(
-                    title: "Move Selected Files to Trash",
+                    title: "Move Selected Files to Bin",
                     subtitle: "Deletes the selected files.",
                     systemImage: "trash",
                     iconColor: .red,
@@ -126,12 +128,24 @@ struct MainSidebarView: View {
             }
             .buttonStyle(.plain)
             .disabled(scanner.selectedItems.isEmpty)
+            .confirmationDialog(
+                "Confirm move selected files to Bin",
+                isPresented: $showConfirmMoveSelectedToTrash,
+                titleVisibility: .visible
+            ) {
+                Button("Move selected files to Bin", role: .destructive) {
+                    _ = scanner.moveSelectedToTrash()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Are you sure you want to move the selected files to Bin?")
+            }
 
             Button(role: .destructive) {
-                _ = scanner.moveAllToTrash()
+                showConfirmMoveAllToTrash = true
             } label: {
                 actionButtonLabel(
-                    title: "Move all Files to Trash",
+                    title: "Move all Files to Bin",
                     subtitle: "Deletes all files.",
                     systemImage: "trash",
                     iconColor: .red,
@@ -140,6 +154,18 @@ struct MainSidebarView: View {
             }
             .buttonStyle(.plain)
             .disabled(scanner.items.isEmpty)
+            .confirmationDialog(
+                "Confirm move all files to Bin",
+                isPresented: $showConfirmMoveAllToTrash,
+                titleVisibility: .visible
+            ) {
+                Button("Move all files to Bin", role: .destructive) {
+                    _ = scanner.moveAllToTrash()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Are you sure you want to move all files to Bin?")
+            }
         }
     }
     

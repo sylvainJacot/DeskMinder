@@ -92,7 +92,7 @@ struct ContentView: View {
 .frame(minWidth: 800, maxWidth: 1000, minHeight: 720, maxHeight: 820)
         .alert("Confirm deletion", isPresented: $showingDeleteConfirmation) {
             Button("Cancel", role: .cancel) { }
-            Button("Move to Trash", role: .destructive) {
+            Button("Move to Bin", role: .destructive) {
                 handleMoveToTrash()
             }
         } message: {
