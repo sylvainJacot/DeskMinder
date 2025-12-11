@@ -152,6 +152,14 @@ struct ContentExplorerView: View {
         Table(of: DesktopItem.self,
               selection: $scanner.selectedItems,
               sortOrder: $scanner.sortOrder) {
+
+                 // ⭐ Nouvelle colonne : étoile Ignore
+        TableColumn("") { item in
+            IgnoreToggleButton(scanner: scanner, item: item)
+                .frame(maxWidth: .infinity, alignment: .center)
+        }
+        .width(24)
+        
             TableColumn("Name", value: \DesktopItem.displayName) { item in
                 HStack(spacing: 8) {
                     FileThumbnailView(url: item.url)

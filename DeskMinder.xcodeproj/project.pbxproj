@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		E433B8322EEB54A9000ACD7A /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = E433B8312EEB54A9000ACD7A /* Sparkle */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		E408DBB22EDB8E9E00660414 /* DeskMinder.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DeskMinder.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -23,6 +27,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E433B8322EEB54A9000ACD7A /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +70,7 @@
 			);
 			name = DeskMinder;
 			packageProductDependencies = (
+				E433B8312EEB54A9000ACD7A /* Sparkle */,
 			);
 			productName = DeskMinder;
 			productReference = E408DBB22EDB8E9E00660414 /* DeskMinder.app */;
@@ -77,6 +83,9 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
+				KnownAssetTags = (
+					New,
+				);
 				LastSwiftUpdateCheck = 2610;
 				LastUpgradeCheck = 2610;
 				TargetAttributes = {
@@ -94,6 +103,9 @@
 			);
 			mainGroup = E408DBA92EDB8E9E00660414;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				E433B8302EEB54A9000ACD7A /* XCRemoteSwiftPackageReference "Sparkle" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = E408DBB32EDB8E9E00660414 /* Products */;
 			projectDirPath = "";
@@ -256,13 +268,13 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = DeskMinder;
-				INFOPLIST_KEY_NSDesktopFolderUsageDescription = "DeskMinder a besoin d'accéder à ton bureau pour lister les fichiers à ranger.";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 15.6;
+				MACOSX_DEPLOYMENT_TARGET = 13.5;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = org.DeskMinder;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -289,13 +301,13 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = DeskMinder;
-				INFOPLIST_KEY_NSDesktopFolderUsageDescription = "DeskMinder a besoin d'accéder à ton bureau pour lister les fichiers à ranger.";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 15.6;
+				MACOSX_DEPLOYMENT_TARGET = 13.5;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = org.DeskMinder;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -331,6 +343,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		E433B8302EEB54A9000ACD7A /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.8.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		E433B8312EEB54A9000ACD7A /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E433B8302EEB54A9000ACD7A /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = E408DBAA2EDB8E9E00660414 /* Project object */;
 }

@@ -1,4 +1,4 @@
-import SwiftUI
+  import SwiftUI
 
 struct ContentHeaderView: View {
     @ObservedObject var scanner: DesktopScanner
@@ -10,7 +10,6 @@ struct ContentHeaderView: View {
         VStack(alignment: .leading, spacing: 12) {
             titleRow
             thresholdControls
-            sortRow
             if let score = scanner.cleanlinessScore {
                 cleanlinessCard(for: score)
             }
@@ -77,15 +76,6 @@ struct ContentHeaderView: View {
                 .font(.caption)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.leading)
-        }
-    }
-    
-    private var sortRow: some View {
-        HStack(spacing: 12) {
-            Text("Active filters: age ≥ \(thresholdUnit.formatted(thresholdValue))")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
     

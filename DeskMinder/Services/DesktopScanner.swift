@@ -32,23 +32,28 @@ class DesktopScanner: ObservableObject {
     }
     let fileCountThreshold = 15
     private let ignoredDefaultsKey = "ignoredDesktopItemPaths"
+    private let minDaysOldDefaultsKey = "minDaysOld"   
     
     /// Minimum age in days for a file to be considered "old"
-    @Published var minDaysOld: Int = 7 {
-        didSet {
-            let clampedValue = min(
-                max(minDaysOld, DesktopScanner.allowedDaysRange.lowerBound),
-                DesktopScanner.allowedDaysRange.upperBound
-            )
-            
-            guard clampedValue == minDaysOld else {
-                minDaysOld = clampedValue
-                return
-            }
-            
-            refresh()
+@Published var minDaysOld: Int = 7 {
+    didSet {
+        let clampedValue = min(
+            max(minDaysOld, DesktopScanner.allowedDaysRange.lowerBound),
+            DesktopScanner.allowedDaysRange.upperBound
+        )
+        
+        guard clampedValue == minDaysOld else {
+            minDaysOld = clampedValue
+            return
         }
+        
+        // 💾 Sauvegarder la valeur choisie par l’utilisateur
+        UserDefaults.standard.set(minDaysOld, forKey: minDaysOldDefaultsKey)
+        
+        refresh()
     }
+}
+
     
     enum SortOption: String, CaseIterable {
         case nameAsc = "Name (A-Z)"
@@ -70,10 +75,81 @@ class DesktopScanner: ObservableObject {
     }
     
     private let fileManager = FileManager.default
+
+    //  monitoring du bureau pour détecter les changements en temps réel
+    private var desktopMonitorSource: DispatchSourceFileSystemObject?
+    private var desktopMonitorFD: CInt = -1
+    private let monitorQueue = DispatchQueue(label: "DeskMinder.desktopMonitor")
+
+        deinit {
+        stopMonitoringDesktop()
+    }
+    
+    private func startMonitoringDesktop() {
+        // Éviter de créer plusieurs sources
+        guard desktopMonitorSource == nil,
+              let desktopURL = fileManager.urls(for: .desktopDirectory, in: .userDomainMask).first
+        else { return }
+        
+        // O_EVTONLY = écoute uniquement les événements
+        desktopMonitorFD = open(desktopURL.path, O_EVTONLY)
+        guard desktopMonitorFD != -1 else { return }
+        
+        let source = DispatchSource.makeFileSystemObjectSource(
+            fileDescriptor: desktopMonitorFD,
+            eventMask: [.write, .rename, .delete, .attrib, .extend],
+            queue: monitorQueue
+        )
+        
+        desktopMonitorSource = source
+        
+        var pendingRefresh = false
+        
+        source.setEventHandler { [weak self] in
+            guard let self = self else { return }
+            
+            // petit debounce (0.5s) pour éviter de rescanner 20x de suite
+            if pendingRefresh { return }
+            pendingRefresh = true
+            
+            self.monitorQueue.asyncAfter(deadline: .now() + 0.5) {
+                pendingRefresh = false
+                DispatchQueue.main.async {
+                    self.refresh()
+                }
+            }
+        }
+        
+        source.setCancelHandler { [weak self] in
+            guard let self = self else { return }
+            if self.desktopMonitorFD != -1 {
+                close(self.desktopMonitorFD)
+                self.desktopMonitorFD = -1
+            }
+        }
+        
+        source.resume()
+    }
+    
+    private func stopMonitoringDesktop() {
+        desktopMonitorSource?.cancel()
+        desktopMonitorSource = nil
+    }
+
     
     init() {
         loadIgnoredItems()
-        refresh()
+        
+        // 🔄 Charger le minDaysOld sauvegardé (si présent)
+        if let saved = UserDefaults.standard.object(forKey: minDaysOldDefaultsKey) as? Int {
+            // Ceci déclenche didSet -> clamp + sauvegarde + refresh()
+            minDaysOld = saved
+        } else {
+            // Aucun réglage sauvegardé → comportement par défaut
+            refresh()
+        }
+        
+        startMonitoringDesktop()
     }
     
     func refresh() {

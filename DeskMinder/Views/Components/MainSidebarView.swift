@@ -63,16 +63,6 @@ struct MainSidebarView: View {
                             .foregroundColor(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-
-                    Divider().padding(.vertical, 6)
-
-                    HStack(spacing: 12) {
-                        Label("\(score.fileCount)", systemImage: "doc.on.doc")
-                        Label("\(score.oldFileCount) old", systemImage: "clock")
-                        Label("avg \(formattedAverageAgeValue(for: score)) d", systemImage: "timer")
-                    }
-                    .font(.caption)
-                    .foregroundColor(.secondary)
                 }
             } else {
                 Text("No recent scan")
@@ -103,17 +93,6 @@ struct MainSidebarView: View {
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(.primary)
                 .textCase(.uppercase)
-            
-            Button {
-                scanner.refresh()
-            } label: {
-                actionButtonLabel(
-                    title: "Rescan Desktop",
-                    subtitle: "Refreshes the list of files to clean up.",
-                    systemImage: "arrow.clockwise"
-                )
-            }
-            .buttonStyle(.plain)
             
             Button(role: .destructive) {
                 showConfirmMoveSelectedToTrash = true
@@ -196,7 +175,7 @@ struct MainSidebarView: View {
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 72)
 
-                    Picker("Unit", selection: $thresholdUnit) {
+                    Picker("", selection: $thresholdUnit) {
                         ForEach(ContentView.ThresholdUnit.allCases) { unit in
                             Text(unit.label.capitalized).tag(unit)
                         }

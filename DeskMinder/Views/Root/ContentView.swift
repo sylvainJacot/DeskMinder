@@ -1,6 +1,125 @@
 import SwiftUI
 import AppKit
 import Quartz
+import Combine
+
+// MARK: - Updates Models & Logic
+
+struct UpdateInfo: Decodable {
+    let latest: String
+    let minSupported: String?
+    let notes: String?
+    let download: String
+}
+
+final class UpdateChecker: ObservableObject {
+    @Published var updateAvailable: Bool = false
+    @Published var updateInfo: UpdateInfo?
+
+    init() {}
+
+    // Récupère la version actuelle (CFBundleShortVersionString)
+    private func currentVersion() -> String {
+        (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "0"
+    }
+
+    /// Compare deux versions de type "1.2.3"
+    private func isNewer(_ remote: String, than local: String) -> Bool {
+        func parts(_ v: String) -> [Int] {
+            v.split(separator: ".").compactMap { Int($0) }
+        }
+
+        let a = parts(local)
+        let b = parts(remote)
+
+        for i in 0..<max(a.count, b.count) {
+            let x = i < a.count ? a[i] : 0
+            let y = i < b.count ? b[i] : 0
+            if y != x { return y > x }
+        }
+        return false
+    }
+
+    /// Lance une vérification d'update à partir d'une URL JSON
+    func check(url: URL) {
+        let task = URLSession.shared.dataTask(with: url) { [weak self] data, _, error in
+            guard let self = self,
+                  error == nil,
+                  let data = data,
+                  let info = try? JSONDecoder().decode(UpdateInfo.self, from: data) else {
+                return
+            }
+
+            let current = self.currentVersion()
+            let newer = self.isNewer(info.latest, than: current)
+
+            DispatchQueue.main.async {
+                self.updateInfo = info
+                self.updateAvailable = newer
+            }
+        }
+        task.resume()
+    }
+}
+
+
+// MARK: - Update Sheet View
+
+struct UpdateSheetView: View {
+    let info: UpdateInfo
+    @Binding var isPresented: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("A new version is available")
+                .font(.title2)
+                .bold()
+
+            Text("Current version: \(currentVersionString())")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+
+            Text("New version: \(info.latest)")
+                .font(.headline)
+
+            if let notes = info.notes, !notes.isEmpty {
+                Text("Release notes:")
+                    .font(.subheadline)
+                    .bold()
+                ScrollView {
+                    Text(notes)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(8)
+                        .background(Color(nsColor: .windowBackgroundColor))
+                        .cornerRadius(8)
+                }
+                .frame(minHeight: 120, maxHeight: 220)
+            }
+
+            HStack {
+                Spacer()
+                Button("Later") {
+                    isPresented = false
+                }
+                Button("Download") {
+                    if let url = URL(string: info.download) {
+                        NSWorkspace.shared.open(url)
+                    }
+                    isPresented = false
+                }
+                .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(24)
+        .frame(width: 460)
+    }
+
+    private func currentVersionString() -> String {
+        (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "Unknown"
+    }
+}
+
+// MARK: - Main Content View
 
 struct ContentView: View {
     enum ListTab: String, CaseIterable, Identifiable {
@@ -56,6 +175,11 @@ struct ContentView: View {
     }
     
     @ObservedObject var scanner: DesktopScanner
+
+    // MARK: - Update state
+    @StateObject private var updateChecker = UpdateChecker()
+    @State private var showingUpdateSheet = false
+
     @State private var showingDeleteConfirmation = false
     @State private var showingFolderPicker = false
     @State private var showingNewFolderSheet = false
@@ -89,7 +213,7 @@ struct ContentView: View {
         .transaction { transaction in
             transaction.animation = nil
         }
-.frame(minWidth: 800, maxWidth: 1000, minHeight: 720, maxHeight: 820)
+        .frame(minWidth: 800, maxWidth: 1000, minHeight: 760, maxHeight: 820)
         .alert("Confirm deletion", isPresented: $showingDeleteConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button("Move to Bin", role: .destructive) {
@@ -101,9 +225,20 @@ struct ContentView: View {
         .sheet(isPresented: $showingNewFolderSheet) {
             NewFolderSheet(scanner: scanner)
         }
+        // Sheet de mise à jour
+        .sheet(isPresented: $showingUpdateSheet) {
+            if let info = updateChecker.updateInfo {
+                UpdateSheetView(info: info, isPresented: $showingUpdateSheet)
+            }
+        }
         .onAppear {
             syncFromScanner()
             installSpaceKeyMonitor()
+
+            // ⚠️ Remplace cette URL par celle de ton appcast JSON (hébergé sur GitHub Pages, par exemple)
+            if let url = URL(string: "https://ton-site.github.io/monapp/appcast.json") {
+                updateChecker.check(url: url)
+            }
         }
         .onDisappear {
             removeSpaceKeyMonitor()
@@ -120,6 +255,12 @@ struct ContentView: View {
         }
         .onChange(of: thresholdUnit) { _ in
             applyThresholdChange()
+        }
+        // Quand une update est détectée, on affiche la sheet
+        .onChange(of: updateChecker.updateAvailable) { newValue in
+            if newValue {
+                showingUpdateSheet = true
+            }
         }
     }
     
@@ -150,6 +291,7 @@ struct ContentView: View {
         scanner.minDaysOld = clampedDays
         thresholdValue = Double(roundedValue)
     }
+
     // MARK: - Actions
     
     private func handleMoveToTrash() {
@@ -157,7 +299,7 @@ struct ContentView: View {
         
         switch result {
         case .success(let count):
-            print("✅ \(count) file(s) moved to the Trash")
+            print("✅ \(count) file(s) moved to the Bin")
         case .failure(let error):
             print("❌ Error: \(error.localizedDescription)")
             // TODO: Present an error alert
@@ -275,18 +417,32 @@ struct ContentView: View {
     }
     
     private func handleKeyDown(_ event: NSEvent) -> NSEvent? {
-        guard event.keyCode == 49 else {
-            return event
-        }
-        
+        // 1) Si on est dans un champ texte, on laisse macOS gérer
         if let responder = event.window?.firstResponder,
            responder is NSTextView {
             return event
         }
         
-        if event.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty {
-            previewSelectedItems()
-            return nil
+        // 2) On regarde les modifieurs (Cmd, Alt, Shift, Ctrl)
+        let flags = event.modifierFlags
+            .intersection(.deviceIndependentFlagsMask)
+        
+        switch event.keyCode {
+        case 49: // Space
+            if flags.isEmpty {
+                previewSelectedItems()
+                return nil // on “consomme” l’événement
+            }
+            
+        case 51, 117: // Delete & Fn+Delete
+            if flags.isEmpty, !scanner.selectedItems.isEmpty {
+                // même comportement que le bouton "Move to Bin"
+                showingDeleteConfirmation = true
+                return nil // très important : on ne laisse pas macOS faire autre chose
+            }
+            
+        default:
+            break
         }
         
         return event

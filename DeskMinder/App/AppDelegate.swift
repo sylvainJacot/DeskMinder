@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import Combine
+import Quartz 
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem!
@@ -9,6 +10,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // Share a single scanner across the entire app
     let scanner = DesktopScanner()
     private var cancellables = Set<AnyCancellable>()
+    
+
+    //  Conserver une référence sur la fenêtre du popover pour gérer les mises à jour en temps réel
+    private weak var popoverWindow: NSWindow?
     
     deinit {
         NotificationCenter.default.removeObserver(self)
@@ -62,18 +67,74 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 private func showPopover() {
     guard let button = statusItem.button else { return }
 
-    // 1. On définit une taille MAXIMALE raisonnable (pas fixe !)
-    popover.contentSize = NSSize(width: 900, height: 640) // ou 960×700 si tu veux plus grand
+    // Taille max raisonnable
+    popover.contentSize = NSSize(width: 900, height: 640)
 
-    // 2. On laisse NSPopover calculer tout seul le meilleur positionnement
+    // Afficher le popover
     popover.show(relativeTo: button.bounds, of: button, preferredEdge: .maxY)
 
-    // 3. LA LIGNE MAGIQUE QUI RÉSOUT TOUT
-    popover.contentViewController?.view.window?.level = .floating
+    // Récupérer la fenêtre du popover
+    if let window = popover.contentViewController?.view.window {
+        popoverWindow = window
+        
+        // Quand on l’ouvre, on veut qu’elle soit devant
+        window.level = .floating
+        
+        // Observer les changements de focus de cette fenêtre
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handlePopoverWindowDidBecomeKey(_:)),
+            name: NSWindow.didBecomeKeyNotification,
+            object: window
+        )
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handlePopoverWindowDidResignKey(_:)),
+            name: NSWindow.didResignKeyNotification,
+            object: window
+        )
+    }
 
-    // Optionnel : focus fort pour que les raccourcis clavier marchent tout de suite
+    // Focus pour que les raccourcis clavier marchent
     NSApp.activate(ignoringOtherApps: true)
     popover.contentViewController?.view.window?.makeKeyAndOrderFront(nil)
+}
+
+@objc private func handlePopoverWindowDidBecomeKey(_ notification: Notification) {
+    guard
+        let window = notification.object as? NSWindow,
+        window === popoverWindow
+    else { return }
+    
+    // Quand DeskMinder redevient la fenêtre active → repasser devant
+    window.level = .floating
+}
+
+@objc private func handlePopoverWindowDidResignKey(_ notification: Notification) {
+    guard
+        let window = notification.object as? NSWindow,
+        window === popoverWindow
+    else { return }
+    
+    // 1) Cas spécial : Quick Look est ouvert → on ne change PAS le z-index
+    if let panel = QLPreviewPanel.shared(), panel.isVisible {
+        // Le panneau de preview passe devant, DeskMinder reste en .floating
+        return
+    }
+    
+    // 2) Si l'app DeskMinder est encore active, c'est juste :
+    //    - une alerte
+    //    - un menu
+    //    - ou un autre panneau interne
+    //    → on NE descend pas la fenêtre
+    if NSApp.isActive {
+        return
+    }
+    
+    // 3) Ici seulement : l'utilisateur est vraiment passé à une autre app
+    //    → on redescend la fenêtre derrière les autres
+    window.level = .normal
 }
     
     @objc private func handleOpenPopoverRequest() {
