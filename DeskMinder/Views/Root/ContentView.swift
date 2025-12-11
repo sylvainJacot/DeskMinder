@@ -236,7 +236,7 @@ struct ContentView: View {
             installSpaceKeyMonitor()
 
             // ⚠️ Remplace cette URL par celle de ton appcast JSON (hébergé sur GitHub Pages, par exemple)
-            if let url = URL(string: "https://ton-site.github.io/monapp/appcast.json") {
+            if let url = URL(string: "https://github.com/sylvainJacot/DeskMinder/blob/main/DeskMinder/appcast.js") {
                 updateChecker.check(url: url)
             }
         }

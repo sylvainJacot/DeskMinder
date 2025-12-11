@@ -1,6 +1,0 @@
-{
-    "latest": "1.1.0",
-        "minSupported": "1.0.0",
-            "notes": "• First release",
-                "download": "https://ezpeazy.gumroad.com/l/DeskMinder"
-}
