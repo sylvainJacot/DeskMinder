@@ -40,10 +40,9 @@ struct ContentExplorerView: View {
             }
             
             currentContent
-                .padding(12)
+
                 .background(.regularMaterial)
                 .cornerRadius(12)
-                .shadow(radius: 3, y: 2)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
             

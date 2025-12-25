@@ -11,33 +11,32 @@ struct MainSidebarView: View {
     private let sliderRange = Double(DesktopScanner.allowedDaysRange.lowerBound)...Double(DesktopScanner.allowedDaysRange.upperBound)
     
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                sidebarHeaderSection
-                Divider()
-                
-                statsSection
-                Divider()
-                
-                quickActionsSection
-                Divider()
-                
-                filtersSection
-                // Divider()
-                
-                // automationSection
+        GeometryReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    sidebarHeaderSection
+                    Divider()
+                    
+                    statsSection
+                    Divider()
+                    
+                    quickActionsSection
+                    Divider()
+                    
+                    filtersSection
+                    // Divider()
+                    
+                    // automationSection
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 18)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(minHeight: proxy.size.height, alignment: .top)
+                .background(Color.white)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 18)
         }
         .frame(minWidth: 260)
         .background(.regularMaterial)
-        .overlay(
-            Rectangle()
-                .frame(width: 1)
-                .foregroundColor(Color(nsColor: .separatorColor)),
-            alignment: .trailing
-        )
     }
     
     // MARK: - Sections
@@ -56,8 +55,8 @@ struct MainSidebarView: View {
                             .font(.system(size: 42, weight: .bold, design: .rounded))
                             .foregroundColor(scoreAccentColor(for: score))
                         Text("files to clean")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(scoreAccentColor(for: score))
                         Text(score.localizedDescription)
                             .font(.caption)
                             .foregroundColor(.secondary)
@@ -73,7 +72,7 @@ struct MainSidebarView: View {
     }
     
     private var statsSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             Label("Statistics", systemImage: "chart.bar")
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(.primary)
@@ -88,7 +87,7 @@ struct MainSidebarView: View {
     }
     
     private var quickActionsSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             Label("Quick Actions", systemImage: "bolt.circle")
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(.primary)
@@ -156,14 +155,13 @@ struct MainSidebarView: View {
                 .textCase(.uppercase)
             
             VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 6) {
-                    Image(systemName: "clock.arrow.circlepath")
-                        .foregroundColor(.secondary)
+                HStack() {
                     Text("Minimum file age")
                         .font(.subheadline.weight(.medium))
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-                HStack(spacing: 12) {
+                HStack() {
                     TextField("Value", text: Binding(
                         get: { String(Int(thresholdValue)) },
                         set: { newValue in
@@ -173,41 +171,29 @@ struct MainSidebarView: View {
                         }
                     ))
                     .textFieldStyle(.roundedBorder)
-                    .frame(width: 72)
+                    .frame(maxWidth: .infinity)
 
                     Picker("", selection: $thresholdUnit) {
                         ForEach(ContentView.ThresholdUnit.allCases) { unit in
                             Text(unit.label.capitalized).tag(unit)
                         }
                     }
-                    .frame(width: 120)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding()
-            .background(Color.secondary.opacity(0.1))
+
             .cornerRadius(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
             
             Text("Active filters: age ≥ \(thresholdUnit.formatted(Int(thresholdValue)))")
                 .font(.caption)
                 .foregroundColor(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
     
-    // private var automationSection: some View {
-    //     VStack(alignment: .leading, spacing: 10) {
-    //         sectionTitle("Automation")
-            
-    //         Toggle(isOn: $autoCleanEnabled) {
-    //             VStack(alignment: .leading, spacing: 2) {
-    //                 Text("Enable automatic cleanup")
-    //                 Text("Prepares upcoming automatic rules (feature in progress).")
-    //                     .font(.caption)
-    //                     .foregroundColor(.secondary)
-    //             }
-    //         }
-    //         .toggleStyle(.switch)
-    //     }
-    // }
     
     // MARK: - Helpers
     

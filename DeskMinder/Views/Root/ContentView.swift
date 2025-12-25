@@ -457,7 +457,7 @@ struct ContentView: View {
             sortOption: .dateNewest
         )
     )
-    .frame(width: 960, height: 520)
+    .frame(width: 960, height: 800)
 }
 
 #Preview("Sort by size") {
@@ -468,6 +468,6 @@ struct ContentView: View {
             sortOption: .sizeDesc
         )
     )
-    .frame(width: 960, height: 520)
+    .frame(width: 960, height: 800)
 }
 #endif
